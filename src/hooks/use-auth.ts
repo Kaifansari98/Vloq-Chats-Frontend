@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useState } from "react"
 import { AUTH_TOKEN_COOKIE, AUTH_USER_COOKIE } from "@/lib/auth"
 import type { AuthenticatedUser } from "@/types/auth"
 
@@ -9,12 +9,20 @@ function readCookie(name: string): string | null {
   return match ? decodeURIComponent(match[1]) : null
 }
 
-export function useAuth(): {
+type AuthState = {
   user: AuthenticatedUser | null
   token: string | null
   isAuthenticated: boolean
-} {
-  return useMemo(() => {
+}
+
+export function useAuth(): AuthState {
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    token: null,
+    isAuthenticated: false,
+  })
+
+  useEffect(() => {
     const token = readCookie(AUTH_TOKEN_COOKIE)
 
     let user: AuthenticatedUser | null = null
@@ -27,6 +35,8 @@ export function useAuth(): {
       }
     }
 
-    return { user, token, isAuthenticated: !!token }
+    setState({ user, token, isAuthenticated: !!token })
   }, [])
+
+  return state
 }
