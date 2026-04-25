@@ -8,6 +8,8 @@ export type AuthenticatedUser = {
   uuid: string;
   name: string;
   email: string;
+  organizationName: string;
+  organizationEmail: string;
 };
 
 export type LoginResponse = {

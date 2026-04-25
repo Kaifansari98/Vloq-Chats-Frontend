@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { DropdownMenu, Dialog } from "radix-ui"
-import { ChevronsUpDown, Settings, Sun, Moon, LogOut, AlertTriangle } from "lucide-react"
+import { ChevronsUpDown, Settings, LogOut, AlertTriangle } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { AUTH_TOKEN_COOKIE, AUTH_USER_COOKIE } from "@/lib/auth"
 import { cn } from "@/lib/utils"
@@ -11,25 +11,15 @@ import { cn } from "@/lib/utils"
 export function UserMenu() {
   const { user } = useAuth()
   const router = useRouter()
-  const [isDark, setIsDark] = useState(true)
   const [logoutOpen, setLogoutOpen] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem("vloq-theme")
+    const stored = localStorage.getItem("theme")
     const dark =
       stored === "dark" ||
       (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches)
-    setIsDark(dark)
     document.documentElement.classList.toggle("dark", dark)
   }, [])
-
-  function toggleTheme(e: Event) {
-    e.preventDefault()
-    const next = !isDark
-    setIsDark(next)
-    document.documentElement.classList.toggle("dark", next)
-    localStorage.setItem("vloq-theme", next ? "dark" : "light")
-  }
 
   function confirmLogout() {
     document.cookie = `${AUTH_TOKEN_COOKIE}=; path=/; max-age=0`
@@ -68,16 +58,16 @@ export function UserMenu() {
         {/* ── Dropdown content ── */}
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            side="top"
-            align="start"
-            sideOffset={8}
+            side="right"
+            align="end"
+            sideOffset={12}
             className={cn(
               "z-50 w-64 rounded-2xl shadow-2xl shadow-black/20 dark:shadow-black/60",
               "border border-slate-200 dark:border-white/9",
               "bg-white dark:bg-[#0e1c32]",
               "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
               "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-              "data-[side=top]:slide-in-from-bottom-2",
+              "data-[side=right]:slide-in-from-left-2",
             )}
           >
             {/* User header */}
@@ -92,31 +82,10 @@ export function UserMenu() {
             </div>
 
             {/* Menu items */}
-            <div className="p-1.5 space-y-0.5">
-
-              {/* Settings */}
+            <div className="p-1.5">
               <DropdownMenu.Item className={itemClass}>
                 <Settings className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                 Settings
-              </DropdownMenu.Item>
-
-              {/* Theme toggle */}
-              <DropdownMenu.Item onSelect={toggleTheme} className={itemClass}>
-                {isDark
-                  ? <Sun className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                  : <Moon className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                }
-                <span className="flex-1">{isDark ? "Light Mode" : "Dark Mode"}</span>
-                {/* pill */}
-                <div className={cn(
-                  "w-8 h-[18px] rounded-full flex items-center px-0.5 transition-colors",
-                  isDark ? "bg-slate-300 dark:bg-slate-700" : "bg-blue-500"
-                )}>
-                  <div className={cn(
-                    "w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform",
-                    isDark ? "translate-x-0" : "translate-x-3.5"
-                  )} />
-                </div>
               </DropdownMenu.Item>
             </div>
 
