@@ -1,10 +1,11 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { UserMenu } from "@/components/chat/user-menu"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import type { ChatConversation } from "@/components/chat/chat-window"
+import type { ChatListFilter } from "@/hooks/use-direct-chats"
 
 const sidebarSpring = {
   type: "spring",
@@ -22,6 +23,7 @@ type ChatSidebarProps = {
   isLoadingDirectChats: boolean
   isSidebarCollapsed: boolean
   search: string
+  activeFilter: ChatListFilter
   user: {
     organizationName?: string | null
     organizationEmail?: string | null
@@ -29,7 +31,14 @@ type ChatSidebarProps = {
   onSelectConversation: (id: string) => void
   onToggleCollapse: () => void
   onSearchChange: (value: string) => void
+  onFilterChange: (value: ChatListFilter) => void
 }
+
+const FILTER_TABS: Array<{ value: ChatListFilter; label: string }> = [
+  { value: "ALL", label: "All" },
+  { value: "UNREAD", label: "Unread" },
+  { value: "GROUPS", label: "Groups" },
+]
 
 export function ChatSidebar({
   conversations,
@@ -38,10 +47,12 @@ export function ChatSidebar({
   isLoadingDirectChats,
   isSidebarCollapsed,
   search,
+  activeFilter,
   user,
   onSelectConversation,
   onToggleCollapse,
   onSearchChange,
+  onFilterChange,
 }: ChatSidebarProps) {
   const orgInitials = user?.organizationName
     ? user.organizationName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
@@ -130,6 +141,40 @@ export function ChatSidebar({
           )}
         </AnimatePresence>
 
+        <AnimatePresence initial={false}>
+          {!isSidebarCollapsed && (
+            <motion.div
+              key="sidebar-filters"
+              initial={{ opacity: 0, y: -6, filter: "blur(4px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -4, filter: "blur(4px)" }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="px-4 pb-3"
+            >
+              <div className="flex gap-2">
+                {FILTER_TABS.map((tab) => {
+                  const isActive = activeFilter === tab.value
+
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => onFilterChange(tab.value)}
+                      className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                        isActive
+                          ? "bg-blue-500 text-white shadow-[0_10px_22px_-16px_rgba(59,130,246,0.9)]"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-white/5 dark:text-slate-400 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Section Label */}
         <AnimatePresence initial={false}>
           {!isSidebarCollapsed && (
@@ -169,6 +214,29 @@ export function ChatSidebar({
                 )}
               </div>
             ))
+          ) : !isSidebarCollapsed &&
+            activeFilter === "UNREAD" &&
+            conversations.length === 0 ? (
+            <div className="flex h-full min-h-[320px] flex-col items-center justify-center px-6 pb-10 text-center">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 shadow-[0_14px_34px_-22px_rgba(59,130,246,0.8)] dark:bg-blue-200/95">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-slate-900/90 dark:border-slate-900/90">
+                  <Check className="h-7 w-7 text-slate-900" />
+                </div>
+              </div>
+              <h3 className="mt-7 text-[22px] font-semibold leading-none text-slate-900 dark:text-white">
+                No unread chats
+              </h3>
+              <p className="mt-3 text-[13px] text-slate-500 dark:text-slate-400">
+                You&apos;re all caught up.
+              </p>
+              <button
+                type="button"
+                onClick={() => onFilterChange("ALL")}
+                className="mt-7 text-[13px] font-semibold text-blue-500 transition-colors hover:text-blue-400"
+              >
+                View all chats
+              </button>
+            </div>
           ) : (
             conversations.map(conv => (
               <button

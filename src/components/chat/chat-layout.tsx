@@ -8,6 +8,7 @@ import {
   type Member,
 } from "@/hooks/use-organization-members";
 import { useDirectChats } from "@/hooks/use-direct-chats";
+import type { ChatListFilter, DirectChat } from "@/hooks/use-direct-chats";
 import {
   useDirectMessages,
   useMarkDirectChatRead,
@@ -123,14 +124,46 @@ function memberToConversation(
   } satisfies ChatConversation;
 }
 
+function directChatToConversation(
+  directChat: DirectChat,
+  gradient: string,
+): ChatConversation {
+  const name = directChat.otherParticipant.name;
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  return {
+    id: directChat.otherParticipant.uuid,
+    memberId: directChat.otherParticipant.id,
+    name,
+    initials,
+    lastMessage: formatLastMessagePreview(directChat.lastMessage),
+    time: formatRelativeTime(directChat.lastMessage?.createdAt),
+    unread: directChat.unreadCount,
+    latestActivityAt: getActivityTimestamp(directChat.lastMessage?.createdAt),
+    online: false,
+    isTyping: false,
+    gradient,
+  };
+}
+
 export function ChatLayout() {
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    typeof window === "undefined"
+      ? null
+      : localStorage.getItem("vloq:selectedChatId"),
+  );
   const [message, setMessage] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState<ChatListFilter>("ALL");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState<number[]>([]);
   const [typingUserIds, setTypingUserIds] = useState<number[]>([]);
@@ -138,7 +171,6 @@ export function ChatLayout() {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingParticipantRef = useRef<number | null>(null);
   const isTypingRef = useRef(false);
-  const hasAutoSelectedRef = useRef(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -219,7 +251,7 @@ export function ChatLayout() {
 
   const { data, isLoading } = useOrganizationMembers(1, debouncedSearch);
   const { data: directChatsData, isLoading: isLoadingDirectChats } =
-    useDirectChats(1, debouncedSearch);
+    useDirectChats(1, debouncedSearch, activeFilter);
   const directChatsByMemberUuid = new Map(
     (directChatsData?.data ?? []).map((chat) => [
       chat.otherParticipant.uuid,
@@ -227,11 +259,24 @@ export function ChatLayout() {
     ]),
   );
 
-  const conversations = (data?.data ?? [])
-    .filter((member) => member.uuid !== user?.uuid)
-    .map((member) =>
-      memberToConversation(member, directChatsByMemberUuid.get(member.uuid)),
-    )
+  const baseConversations =
+    activeFilter === "ALL"
+      ? (data?.data ?? [])
+          .filter((member) => member.uuid !== user?.uuid)
+          .map((member) =>
+            memberToConversation(
+              member,
+              directChatsByMemberUuid.get(member.uuid),
+            ),
+          )
+      : (directChatsData?.data ?? []).map((chat) =>
+          directChatToConversation(
+            chat,
+            GRADIENTS[chat.otherParticipant.id % GRADIENTS.length],
+          ),
+        );
+
+  const conversations = baseConversations
     .map((conversation) => ({
       ...conversation,
       online: onlineUserIds.includes(conversation.memberId),
@@ -245,7 +290,11 @@ export function ChatLayout() {
       return a.name.localeCompare(b.name);
     });
 
-  const selected = conversations.find((c) => c.id === selectedId);
+  const effectiveSelectedId =
+    selectedId && conversations.some((conversation) => conversation.id === selectedId)
+      ? selectedId
+      : conversations[0]?.id ?? null;
+  const selected = conversations.find((c) => c.id === effectiveSelectedId);
   const { data: messagesData, isLoading: isLoadingMessages } =
     useDirectMessages(selected?.memberId);
   const sendDirectMessage = useSendDirectMessage(selected?.memberId);
@@ -291,18 +340,6 @@ export function ChatLayout() {
       stopTyping();
     }, 1200);
   }
-
-  useEffect(() => {
-    if (isLoading || isLoadingDirectChats || hasAutoSelectedRef.current) return;
-    if (conversations.length === 0) return;
-
-    hasAutoSelectedRef.current = true;
-
-    const stored = localStorage.getItem("vloq:selectedChatId");
-    const match = stored ? conversations.find((c) => c.id === stored) : null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelectedId(match ? match.id : conversations[0].id);
-  }, [isLoading, isLoadingDirectChats, conversations]);
 
   function selectConversation(id: string) {
     setSelectedFiles([]);
@@ -357,15 +394,17 @@ export function ChatLayout() {
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#070d1e] text-slate-900 dark:text-slate-100">
       <ChatSidebar
         conversations={conversations}
-        selectedId={selectedId}
+        selectedId={effectiveSelectedId}
         isLoading={isLoading}
         isLoadingDirectChats={isLoadingDirectChats}
         isSidebarCollapsed={isSidebarCollapsed}
         search={search}
+        activeFilter={activeFilter}
         user={user}
         onSelectConversation={selectConversation}
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
         onSearchChange={setSearch}
+        onFilterChange={setActiveFilter}
       />
 
       {selected ? (

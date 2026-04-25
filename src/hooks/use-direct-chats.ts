@@ -21,6 +21,8 @@ export type DirectChat = {
   } | null
 }
 
+export type ChatListFilter = "ALL" | "UNREAD" | "GROUPS"
+
 type DirectChatsResponse = {
   data: DirectChat[]
   total: number
@@ -28,15 +30,16 @@ type DirectChatsResponse = {
   limit: number
 }
 
-export function useDirectChats(page = 1, search = "") {
+export function useDirectChats(page = 1, search = "", filter: ChatListFilter = "ALL") {
   return useQuery<DirectChatsResponse>({
-    queryKey: ["direct-chats", page, search],
+    queryKey: ["direct-chats", page, search, filter],
     queryFn: async () => {
       const { data } = await api.get<DirectChatsResponse>("/chats/direct", {
         params: {
           page,
           limit: 50,
           search,
+          filter,
         },
       })
       return data
