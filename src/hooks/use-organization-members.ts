@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api"
 
 export type Member = {
+  id: number
   uuid: string
   name: string
   email: string

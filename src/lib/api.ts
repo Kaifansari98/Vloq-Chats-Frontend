@@ -6,9 +6,11 @@ const API_URLS_BY_ENVIRONMENT: Record<string, string> = {
 };
 
 const environment = process.env.NEXT_PUBLIC_ENVIRONMENT?.toUpperCase() ?? "LOCAL";
+export const API_BASE_URL =
+  API_URLS_BY_ENVIRONMENT[environment] ?? API_URLS_BY_ENVIRONMENT.LOCAL;
 
 export const api = axios.create({
-  baseURL: API_URLS_BY_ENVIRONMENT[environment] ?? API_URLS_BY_ENVIRONMENT.LOCAL,
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },

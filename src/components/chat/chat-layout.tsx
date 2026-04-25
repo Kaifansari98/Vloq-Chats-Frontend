@@ -1,12 +1,25 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Search, Send, Phone, Video, MoreHorizontal } from "lucide-react"
-import { UserMenu } from "@/components/chat/user-menu"
-import { useAuth } from "@/hooks/use-auth"
-import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
-import { useOrganizationMembers, type Member } from "@/hooks/use-organization-members"
-import { EmptyChat } from "@/components/chat/empty-chat"
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  useOrganizationMembers,
+  type Member,
+} from "@/hooks/use-organization-members";
+import { useDirectChats } from "@/hooks/use-direct-chats";
+import {
+  useDirectMessages,
+  useMarkDirectChatRead,
+  useSendDirectMessage,
+} from "@/hooks/use-direct-messages";
+import { EmptyChat } from "@/components/chat/empty-chat";
+import {
+  ChatWindow,
+  type ChatConversation,
+} from "@/components/chat/chat-window";
+import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { createChatSocket, type ChatSocket } from "@/lib/socket";
 
 const GRADIENTS = [
   "from-violet-500 to-purple-600",
@@ -17,239 +30,355 @@ const GRADIENTS = [
   "from-indigo-500 to-blue-600",
   "from-fuchsia-500 to-pink-600",
   "from-orange-500 to-red-600",
-]
+];
 
-const DUMMY_MESSAGES = [
-  "Hey, did you see the latest update?",
-  "The meeting is at 3pm today",
-  "Can you review this PR?",
-  "Thanks! Talk soon.",
-  "I'll check it out after standup.",
-  "Sounds good to me!",
-  "Let me know when you're free.",
-  "Great work on the demo!",
-]
+function formatRelativeTime(dateString?: string) {
+  if (!dateString) return "";
 
-const DUMMY_TIMES = ["2m", "14m", "1h", "2h", "3h", "Yesterday", "Mon", "Tue"]
-const DUMMY_UNREADS = [3, 0, 7, 0, 1, 0, 0, 2]
+  const timestamp = new Date(dateString).getTime();
 
-function memberToConversation(member: Member, index: number) {
-  const initials = member.name
-    .split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-  return {
-    id: member.uuid,
-    name: member.name,
-    initials,
-    lastMessage: DUMMY_MESSAGES[index % DUMMY_MESSAGES.length],
-    time: DUMMY_TIMES[index % DUMMY_TIMES.length],
-    unread: DUMMY_UNREADS[index % DUMMY_UNREADS.length],
-    online: index % 3 === 0,
-    gradient: GRADIENTS[index % GRADIENTS.length],
+  if (Number.isNaN(timestamp)) return "";
+
+  const diffMs = Date.now() - timestamp;
+  const diffMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60)));
+
+  if (diffMinutes < 1) return "now";
+  if (diffMinutes < 60) return `${diffMinutes}m`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+
+  if (diffHours < 24) return `${diffHours}h`;
+
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d`;
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(timestamp));
+}
+
+function getActivityTimestamp(dateString?: string) {
+  if (!dateString) return 0;
+
+  const timestamp = new Date(dateString).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function formatLastMessagePreview(
+  lastMessage?: {
+    content: string | null;
+    type: string;
+  } | null,
+) {
+  if (!lastMessage) return "No messages yet";
+  if (lastMessage.content?.trim()) return lastMessage.content;
+
+  switch (lastMessage.type) {
+    case "IMAGE":
+      return "Sent an image";
+    case "VIDEO":
+      return "Sent a video";
+    case "AUDIO":
+      return "Sent an audio message";
+    case "FILE":
+      return "Sent a file";
+    default:
+      return "New message";
   }
 }
 
+function memberToConversation(
+  member: Member,
+  directChat?: {
+    unreadCount: number;
+    lastMessage: {
+      content: string | null;
+      type: string;
+      createdAt: string;
+    } | null;
+  },
+) {
+  const initials = member.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  return {
+    id: member.uuid,
+    memberId: member.id,
+    name: member.name,
+    initials,
+    lastMessage: formatLastMessagePreview(directChat?.lastMessage),
+    time: formatRelativeTime(directChat?.lastMessage?.createdAt),
+    unread: directChat?.unreadCount ?? 0,
+    latestActivityAt: getActivityTimestamp(directChat?.lastMessage?.createdAt),
+    online: false,
+    isTyping: false,
+    gradient: GRADIENTS[member.id % GRADIENTS.length],
+  } satisfies ChatConversation;
+}
+
 export function ChatLayout() {
-  const { user } = useAuth()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [message, setMessage] = useState("")
-  const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const { user, token } = useAuth();
+  const queryClient = useQueryClient();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [onlineUserIds, setOnlineUserIds] = useState<number[]>([]);
+  const [typingUserIds, setTypingUserIds] = useState<number[]>([]);
+  const socketRef = useRef<ChatSocket | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingParticipantRef = useRef<number | null>(null);
+  const isTypingRef = useRef(false);
+  const hasAutoSelectedRef = useRef(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(t)
-  }, [search])
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const { data, isLoading } = useOrganizationMembers(1, debouncedSearch)
+  useEffect(() => {
+    if (!token) return;
 
-  const conversations = (data?.data ?? []).map(memberToConversation)
-  const selected = conversations.find(c => c.id === selectedId)
+    const socket = createChatSocket(token);
+    socketRef.current = socket;
 
-  const orgInitials = user?.organizationName
-    ? user.organizationName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-    : "V"
+    socket.on("direct_message:new", (incomingMessage: { senderId: number }) => {
+      void queryClient.invalidateQueries({ queryKey: ["direct-messages"] });
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+      setTypingUserIds((prev) =>
+        prev.filter((userId) => userId !== incomingMessage.senderId),
+      );
+    });
 
-  function sendMessage() {
-    if (!message.trim()) return
-    setMessage("")
-    // TODO: wire to socket/API
+    socket.on("direct_message:read", () => {
+      void queryClient.invalidateQueries({ queryKey: ["direct-messages"] });
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+    });
+
+    socket.on("presence:snapshot", (payload: { onlineUserIds?: number[] }) => {
+      setOnlineUserIds(
+        Array.isArray(payload.onlineUserIds) ? payload.onlineUserIds : [],
+      );
+    });
+
+    socket.on(
+      "presence:changed",
+      (payload: { userId?: number; isOnline?: boolean }) => {
+        if (typeof payload.userId !== "number") return;
+        const userId = payload.userId;
+        setOnlineUserIds((prev) => {
+          const next = new Set(prev);
+          if (payload.isOnline) {
+            next.add(userId);
+          } else {
+            next.delete(userId);
+          }
+          return Array.from(next);
+        });
+      },
+    );
+
+    socket.on(
+      "direct_message:typing",
+      (payload: { fromUserId?: number; isTyping?: boolean }) => {
+        if (typeof payload.fromUserId !== "number") return;
+        const fromUserId = payload.fromUserId;
+        setTypingUserIds((prev) => {
+          const next = new Set(prev);
+          if (payload.isTyping) {
+            next.add(fromUserId);
+          } else {
+            next.delete(fromUserId);
+          }
+          return Array.from(next);
+        });
+      },
+    );
+
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      socketRef.current = null;
+      socket.disconnect();
+    };
+  }, [token, queryClient]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
+
+  const { data, isLoading } = useOrganizationMembers(1, debouncedSearch);
+  const { data: directChatsData, isLoading: isLoadingDirectChats } =
+    useDirectChats(1, debouncedSearch);
+  const directChatsByMemberUuid = new Map(
+    (directChatsData?.data ?? []).map((chat) => [
+      chat.otherParticipant.uuid,
+      chat,
+    ]),
+  );
+
+  const conversations = (data?.data ?? [])
+    .filter((member) => member.uuid !== user?.uuid)
+    .map((member) =>
+      memberToConversation(member, directChatsByMemberUuid.get(member.uuid)),
+    )
+    .map((conversation) => ({
+      ...conversation,
+      online: onlineUserIds.includes(conversation.memberId),
+      isTyping: typingUserIds.includes(conversation.memberId),
+    }))
+    .sort((a, b) => {
+      if (a.latestActivityAt !== b.latestActivityAt) {
+        return b.latestActivityAt - a.latestActivityAt;
+      }
+      if (a.unread !== b.unread) return b.unread - a.unread;
+      return a.name.localeCompare(b.name);
+    });
+
+  const selected = conversations.find((c) => c.id === selectedId);
+  const { data: messagesData, isLoading: isLoadingMessages } =
+    useDirectMessages(selected?.memberId);
+  const sendDirectMessage = useSendDirectMessage(selected?.memberId);
+  const markDirectChatRead = useMarkDirectChatRead();
+
+  function emitTypingState(participantUserId: number, isTyping: boolean) {
+    const socket = socketRef.current;
+    if (!socket) return;
+    socket.emit("direct_message:typing", { participantUserId, isTyping });
+  }
+
+  function stopTyping() {
+    if (!isTypingRef.current || !typingParticipantRef.current) return;
+    emitTypingState(typingParticipantRef.current, false);
+    isTypingRef.current = false;
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+  }
+
+  function handleMessageChange(value: string) {
+    setMessage(value);
+
+    if (!selected?.memberId) return;
+
+    typingParticipantRef.current = selected.memberId;
+
+    if (!value.trim()) {
+      stopTyping();
+      return;
+    }
+
+    if (!isTypingRef.current) {
+      emitTypingState(selected.memberId, true);
+      isTypingRef.current = true;
+    }
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      stopTyping();
+    }, 1200);
+  }
+
+  useEffect(() => {
+    if (isLoading || isLoadingDirectChats || hasAutoSelectedRef.current) return;
+    if (conversations.length === 0) return;
+
+    hasAutoSelectedRef.current = true;
+
+    const stored = localStorage.getItem("vloq:selectedChatId");
+    const match = stored ? conversations.find((c) => c.id === stored) : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedId(match ? match.id : conversations[0].id);
+  }, [isLoading, isLoadingDirectChats, conversations]);
+
+  function selectConversation(id: string) {
+    setSelectedId(id);
+    localStorage.setItem("vloq:selectedChatId", id);
+  }
+
+  const selectedMemberId = selected?.memberId;
+
+  useEffect(() => {
+    stopTyping();
+    typingParticipantRef.current = selectedMemberId ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMemberId]);
+
+  useEffect(() => {
+    if (!selected?.memberId || isLoadingMessages || !messagesData?.data?.length)
+      return;
+
+    const hasUnreadMessages = conversations.some(
+      (c) => c.memberId === selected.memberId && c.unread > 0,
+    );
+
+    if (!hasUnreadMessages || markDirectChatRead.isPending) return;
+
+    markDirectChatRead.mutate(selected.memberId);
+  }, [
+    conversations,
+    isLoadingMessages,
+    markDirectChatRead,
+    messagesData?.data?.length,
+    selected?.memberId,
+  ]);
+
+  async function sendMessage() {
+    const content = message.trim();
+    if (!content || !selected?.memberId) return;
+    stopTyping();
+    await sendDirectMessage.mutateAsync(content);
+    setMessage("");
   }
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#070d1e] text-slate-900 dark:text-slate-100">
+      <ChatSidebar
+        conversations={conversations}
+        selectedId={selectedId}
+        isLoading={isLoading}
+        isLoadingDirectChats={isLoadingDirectChats}
+        isSidebarCollapsed={isSidebarCollapsed}
+        search={search}
+        user={user}
+        onSelectConversation={selectConversation}
+        onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+        onSearchChange={setSearch}
+      />
 
-      {/* ── Left Sidebar ── */}
-      <aside className="w-72 shrink-0 flex flex-col bg-white dark:bg-[#0b1425] border-r border-slate-200 dark:border-white/6">
-
-        {/* Brand: org info + theme toggle */}
-        <div className="flex items-center justify-between px-4 h-[68px] border-b border-slate-200 dark:border-white/6">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 shrink-0 rounded-xl bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-              <span className="text-[13px] font-bold text-white">{orgInitials}</span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-slate-900 dark:text-white leading-tight truncate">
-                {user?.organizationName ?? "Workspace"}
-              </p>
-              <p className="text-[11px] text-slate-400 dark:text-slate-600 truncate">
-                {user?.organizationEmail ?? ""}
-              </p>
-            </div>
-          </div>
-          <AnimatedThemeToggler
-            variant="circle"
-            duration={500}
-            className="w-8 h-8 shrink-0 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/6 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-colors ml-2 [&_svg]:w-4 [&_svg]:h-4"
-          />
-        </div>
-
-        {/* Search */}
-        <div className="px-4 py-3">
-          <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/4 border border-slate-200 dark:border-white/7 rounded-xl px-3 py-2.5">
-            <Search className="w-3.5 h-3.5 text-slate-400 dark:text-slate-600 shrink-0" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="bg-transparent text-sm text-slate-700 dark:text-slate-300 placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none w-full"
-            />
-          </div>
-        </div>
-
-        {/* Section Label */}
-        <p className="px-5 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-700">
-          Direct Messages
-        </p>
-
-        {/* Conversations */}
-        <div className="flex-1 overflow-y-auto px-2 space-y-0.5 pb-2">
-          {isLoading ? (
-            Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl animate-pulse">
-                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/8 shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3 bg-slate-200 dark:bg-white/8 rounded w-2/3" />
-                  <div className="h-2.5 bg-slate-100 dark:bg-white/5 rounded w-full" />
-                </div>
-              </div>
-            ))
-          ) : (
-            conversations.map(conv => (
-              <button
-                key={conv.id}
-                onClick={() => setSelectedId(conv.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left ${
-                  selectedId === conv.id
-                    ? "bg-slate-100 dark:bg-white/9"
-                    : "hover:bg-slate-50 dark:hover:bg-white/4"
-                }`}
-              >
-                <div className="relative shrink-0">
-                  <div className={`w-10 h-10 rounded-full bg-linear-to-br ${conv.gradient} flex items-center justify-center text-[11px] font-semibold text-white`}>
-                    {conv.initials}
-                  </div>
-                  {conv.online && (
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white dark:border-[#0b1425]" />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`text-[13px] font-medium truncate ${
-                      selectedId === conv.id
-                        ? "text-slate-900 dark:text-white"
-                        : "text-slate-600 dark:text-slate-300"
-                    }`}>
-                      {conv.name}
-                    </span>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-700 shrink-0">{conv.time}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-600 truncate mt-0.5">{conv.lastMessage}</p>
-                </div>
-
-                {conv.unread > 0 && (
-                  <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-500 text-[10px] font-semibold text-white flex items-center justify-center">
-                    {conv.unread}
-                  </span>
-                )}
-              </button>
-            ))
-          )}
-        </div>
-
-        {/* User Menu */}
-        <div className="px-2 py-2 border-t border-slate-200 dark:border-white/6">
-          <UserMenu />
-        </div>
-      </aside>
-
-      {/* ── Chat Window ── */}
-      <main className="flex-1 flex flex-col min-w-0">
-        {selected ? (
-          <>
-            {/* Chat Header */}
-            <div className="flex items-center justify-between px-6 h-[68px] border-b border-slate-200 dark:border-white/6 bg-white dark:bg-[#070d1e] shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className={`w-9 h-9 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-[11px] font-semibold text-white`}>
-                    {selected.initials}
-                  </div>
-                  {selected.online && (
-                    <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 rounded-full border-2 border-white dark:border-[#070d1e]" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white leading-none">{selected.name}</p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-600 mt-0.5">{selected.online ? "Active now" : "Offline"}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                {[Phone, Video, MoreHorizontal].map((Icon, i) => (
-                  <button key={i} className="w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors">
-                    <Icon className="w-4 h-4 text-slate-400 dark:text-slate-600" />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Messages — empty until real messaging is wired */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 flex items-center justify-center">
-              <div className="text-center space-y-2">
-                <div className={`w-12 h-12 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-sm font-semibold text-white mx-auto`}>
-                  {selected.initials}
-                </div>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{selected.name}</p>
-                <p className="text-[12px] text-slate-400 dark:text-slate-600">No messages yet. Say hello!</p>
-              </div>
-            </div>
-
-            {/* Input */}
-            <div className="px-6 py-4 border-t border-slate-200 dark:border-white/6 bg-white dark:bg-[#070d1e] shrink-0">
-              <div className="flex items-center gap-3 bg-slate-100 dark:bg-white/4 border border-slate-200 dark:border-white/8 rounded-2xl px-4 py-3 focus-within:border-blue-400/60 dark:focus-within:border-blue-500/30 transition-colors">
-                <input
-                  type="text"
-                  placeholder={`Message ${selected.name}...`}
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && sendMessage()}
-                  className="flex-1 bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-700 outline-none"
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={!message.trim()}
-                  className="w-8 h-8 rounded-xl bg-blue-500 hover:bg-blue-400 disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center transition-all shrink-0 shadow-md shadow-blue-500/20"
-                >
-                  <Send className="w-3.5 h-3.5 text-white" />
-                </button>
-              </div>
-              <p className="text-[10px] text-slate-400 dark:text-slate-800 text-center mt-2">Press Enter to send</p>
-            </div>
-          </>
-        ) : (
+      {selected ? (
+        <ChatWindow
+          selected={selected}
+          message={message}
+          messages={(messagesData?.data ?? []).map((item) => ({
+            uuid: item.uuid,
+            content: item.content,
+            senderName: item.senderName,
+            isOwnMessage: item.isOwnMessage,
+            createdAt: item.createdAt,
+            status: item.status,
+          }))}
+          isLoadingMessages={isLoadingMessages}
+          isSendingMessage={sendDirectMessage.isPending}
+          isPeerTyping={typingUserIds.includes(selected.memberId)}
+          onMessageChange={handleMessageChange}
+          onSendMessage={sendMessage}
+        />
+      ) : (
+        <main className="flex-1 flex flex-col min-w-0">
           <EmptyChat />
-        )}
-      </main>
+        </main>
+      )}
     </div>
-  )
+  );
 }

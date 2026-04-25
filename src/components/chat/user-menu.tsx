@@ -8,7 +8,11 @@ import { useAuth } from "@/hooks/use-auth"
 import { AUTH_TOKEN_COOKIE, AUTH_USER_COOKIE } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 
-export function UserMenu() {
+type UserMenuProps = {
+  collapsed?: boolean
+}
+
+export function UserMenu({ collapsed = false }: UserMenuProps) {
   const { user } = useAuth()
   const router = useRouter()
   const [logoutOpen, setLogoutOpen] = useState(false)
@@ -43,15 +47,21 @@ export function UserMenu() {
 
         {/* ── Trigger: user card ── */}
         <DropdownMenu.Trigger asChild>
-          <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-colors outline-none hover:bg-slate-100 dark:hover:bg-white/6 data-[state=open]:bg-slate-100 dark:data-[state=open]:bg-white/8">
+          <button className={`flex w-full items-center rounded-xl transition-colors outline-none hover:bg-slate-100 dark:hover:bg-white/6 data-[state=open]:bg-slate-100 dark:data-[state=open]:bg-white/8 ${
+            collapsed ? "justify-center px-0 py-3" : "gap-3 px-3 py-2.5"
+          }`}>
             <div className="w-9 h-9 shrink-0 rounded-full bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[11px] font-semibold text-white shadow-md shadow-blue-500/20">
               {initials}
             </div>
-            <div className="flex-1 min-w-0 text-left">
-              <p className="text-[13px] font-medium text-slate-700 dark:text-slate-200 truncate">{user?.name ?? "You"}</p>
-              <p className="text-[11px] text-slate-400 dark:text-slate-600 truncate">{user?.email ?? ""}</p>
-            </div>
-            <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-700 shrink-0" />
+            {!collapsed && (
+              <>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-[13px] font-medium text-slate-700 dark:text-slate-200 truncate">{user?.name ?? "You"}</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-600 truncate">{user?.email ?? ""}</p>
+                </div>
+                <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-700 shrink-0" />
+              </>
+            )}
           </button>
         </DropdownMenu.Trigger>
 
