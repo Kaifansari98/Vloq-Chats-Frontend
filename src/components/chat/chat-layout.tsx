@@ -12,6 +12,7 @@ import {
   useDirectMessages,
   useMarkDirectChatRead,
   useSendDirectMessage,
+  useUploadDirectMessage,
 } from "@/hooks/use-direct-messages";
 import { EmptyChat } from "@/components/chat/empty-chat";
 import {
@@ -127,6 +128,7 @@ export function ChatLayout() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -247,6 +249,7 @@ export function ChatLayout() {
   const { data: messagesData, isLoading: isLoadingMessages } =
     useDirectMessages(selected?.memberId);
   const sendDirectMessage = useSendDirectMessage(selected?.memberId);
+  const uploadDirectMessage = useUploadDirectMessage(selected?.memberId);
   const markDirectChatRead = useMarkDirectChatRead();
 
   function emitTypingState(participantUserId: number, isTyping: boolean) {
@@ -302,6 +305,7 @@ export function ChatLayout() {
   }, [isLoading, isLoadingDirectChats, conversations]);
 
   function selectConversation(id: string) {
+    setSelectedFiles([]);
     setSelectedId(id);
     localStorage.setItem("vloq:selectedChatId", id);
   }
@@ -335,10 +339,18 @@ export function ChatLayout() {
 
   async function sendMessage() {
     const content = message.trim();
-    if (!content || !selected?.memberId) return;
+    if ((!content && selectedFiles.length === 0) || !selected?.memberId) return;
+
     stopTyping();
-    await sendDirectMessage.mutateAsync(content);
+
+    if (selectedFiles.length > 0) {
+      await uploadDirectMessage.mutateAsync({ content, files: selectedFiles });
+    } else {
+      await sendDirectMessage.mutateAsync(content);
+    }
+
     setMessage("");
+    setSelectedFiles([]);
   }
 
   return (
@@ -367,12 +379,20 @@ export function ChatLayout() {
             isOwnMessage: item.isOwnMessage,
             createdAt: item.createdAt,
             status: item.status,
+            attachments: item.attachments,
           }))}
           isLoadingMessages={isLoadingMessages}
-          isSendingMessage={sendDirectMessage.isPending}
+          selectedFiles={selectedFiles}
+          isSendingMessage={
+            sendDirectMessage.isPending || uploadDirectMessage.isPending
+          }
           isPeerTyping={typingUserIds.includes(selected.memberId)}
           onMessageChange={handleMessageChange}
           onSendMessage={sendMessage}
+          onFileSelect={setSelectedFiles}
+          onRemoveFile={(index) =>
+            setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+          }
         />
       ) : (
         <main className="flex-1 flex flex-col min-w-0">

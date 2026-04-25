@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
 
+export type MessageAttachment = {
+  uuid: string
+  attachmentType: string
+  name: string
+  url: string   // signed Wasabi URL — expires after 24 h
+  mimeType: string
+  sizeBytes: number
+}
+
 export type DirectMessage = {
   uuid: string
   conversationUuid: string
@@ -13,6 +22,7 @@ export type DirectMessage = {
   updatedAt: string
   isOwnMessage: boolean
   status: "sent" | "read"
+  attachments: MessageAttachment[]
 }
 
 type DirectMessagesResponse = {
@@ -49,12 +59,32 @@ export function useSendDirectMessage(participantUserId?: number) {
       return data
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ["direct-messages", participantUserId],
-      })
-      void queryClient.invalidateQueries({
-        queryKey: ["direct-chats"],
-      })
+      void queryClient.invalidateQueries({ queryKey: ["direct-messages", participantUserId] })
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] })
+    },
+  })
+}
+
+export function useUploadDirectMessage(participantUserId?: number) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ content, files }: { content: string; files: File[] }) => {
+      const formData = new FormData()
+      formData.append("participantUserId", String(participantUserId))
+      if (content.trim()) formData.append("content", content.trim())
+      for (const file of files) formData.append("files", file)
+
+      const { data } = await api.post<SendDirectMessageResponse>(
+        "/chats/direct/messages/upload",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      )
+      return data
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["direct-messages", participantUserId] })
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] })
     },
   })
 }
@@ -70,9 +100,7 @@ export function useMarkDirectChatRead() {
       return data
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ["direct-chats"],
-      })
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] })
     },
   })
 }
