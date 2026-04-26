@@ -21,14 +21,39 @@ export type DirectChat = {
   } | null
 }
 
+export type GroupChat = {
+  uuid: string
+  type: "GROUP"
+  name: string
+  createdAt: string
+  updatedAt: string
+  unreadCount: number
+  participants: Array<{
+    id: number
+    uuid: string
+    name: string
+    email: string
+  }>
+  lastMessage: {
+    uuid: string
+    content: string | null
+    type: string
+    createdAt: string
+  } | null
+}
+
+export type Chat = DirectChat | GroupChat
+
 export type ChatListFilter = "ALL" | "UNREAD" | "GROUPS"
 
 type DirectChatsResponse = {
-  data: DirectChat[]
+  data: Chat[]
   total: number
   page: number
   limit: number
 }
+
+export type { DirectChatsResponse }
 
 export function useDirectChats(page = 1, search = "", filter: ChatListFilter = "ALL") {
   return useQuery<DirectChatsResponse>({

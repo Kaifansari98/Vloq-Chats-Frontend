@@ -1,7 +1,7 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { Check, ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, MessageSquarePlus, Search, Users } from "lucide-react"
 import { UserMenu } from "@/components/chat/user-menu"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import type { ChatConversation } from "@/components/chat/chat-window"
@@ -32,6 +32,7 @@ type ChatSidebarProps = {
   onToggleCollapse: () => void
   onSearchChange: (value: string) => void
   onFilterChange: (value: ChatListFilter) => void
+  onCreateGroup: () => void
 }
 
 const FILTER_TABS: Array<{ value: ChatListFilter; label: string }> = [
@@ -53,6 +54,7 @@ export function ChatSidebar({
   onToggleCollapse,
   onSearchChange,
   onFilterChange,
+  onCreateGroup,
 }: ChatSidebarProps) {
   const orgInitials = user?.organizationName
     ? user.organizationName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
@@ -235,6 +237,30 @@ export function ChatSidebar({
                 className="mt-7 text-[13px] font-semibold text-blue-500 transition-colors hover:text-blue-400"
               >
                 View all chats
+              </button>
+            </div>
+          ) : !isSidebarCollapsed &&
+            activeFilter === "GROUPS" &&
+            conversations.length === 0 ? (
+            <div className="flex h-full min-h-[320px] flex-col items-center justify-center px-6 pb-10 text-center">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-violet-100 shadow-[0_14px_34px_-22px_rgba(139,92,246,0.7)] dark:bg-violet-300/20">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-violet-500/80 dark:border-violet-400/80">
+                  <Users className="h-7 w-7 text-violet-600 dark:text-violet-400" />
+                </div>
+              </div>
+              <h3 className="mt-7 text-[22px] font-semibold leading-none text-slate-900 dark:text-white">
+                No groups yet
+              </h3>
+              <p className="mt-3 text-[13px] text-slate-500 dark:text-slate-400">
+                Create a group to chat with multiple people.
+              </p>
+              <button
+                type="button"
+                onClick={onCreateGroup}
+                className="mt-7 inline-flex items-center gap-2 rounded-full bg-blue-500 px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(59,130,246,0.8)] transition-all hover:bg-blue-400 active:scale-95"
+              >
+                <MessageSquarePlus className="w-4 h-4" />
+                Create Group
               </button>
             </div>
           ) : (

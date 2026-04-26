@@ -8,19 +8,31 @@ import {
   type Member,
 } from "@/hooks/use-organization-members";
 import { useDirectChats } from "@/hooks/use-direct-chats";
-import type { ChatListFilter, DirectChat } from "@/hooks/use-direct-chats";
+import type {
+  ChatListFilter,
+  DirectChat,
+  DirectChatsResponse,
+  GroupChat,
+} from "@/hooks/use-direct-chats";
 import {
   useDirectMessages,
+  type DirectMessage,
   useMarkDirectChatRead,
   useSendDirectMessage,
   useUploadDirectMessage,
 } from "@/hooks/use-direct-messages";
+import {
+  useGroupMessages,
+  useSendGroupMessage,
+  useUploadGroupMessage,
+} from "@/hooks/use-group-messages";
 import { EmptyChat } from "@/components/chat/empty-chat";
 import {
   ChatWindow,
   type ChatConversation,
 } from "@/components/chat/chat-window";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { CreateGroupModal } from "@/components/chat/create-group-modal";
 import { createChatSocket, type ChatSocket } from "@/lib/socket";
 
 const GRADIENTS = [
@@ -151,6 +163,43 @@ function directChatToConversation(
   };
 }
 
+function groupChatToConversation(
+  groupChat: GroupChat,
+  gradient: string,
+): ChatConversation {
+  const name = groupChat.name;
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  return {
+    id: groupChat.uuid,
+    memberId: 0,
+    name,
+    initials,
+    lastMessage: formatLastMessagePreview(groupChat.lastMessage),
+    time: formatRelativeTime(groupChat.lastMessage?.createdAt),
+    unread: groupChat.unreadCount,
+    latestActivityAt: getActivityTimestamp(groupChat.lastMessage?.createdAt),
+    online: false,
+    isTyping: false,
+    gradient,
+    participants: groupChat.participants.map((p) => ({
+      id: p.id,
+      name: p.name,
+      initials: p.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2),
+    })),
+  };
+}
+
 export function ChatLayout() {
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
@@ -165,11 +214,17 @@ export function ChatLayout() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<ChatListFilter>("ALL");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState<number[]>([]);
   const [typingUserIds, setTypingUserIds] = useState<number[]>([]);
+  const [groupTypingUsers, setGroupTypingUsers] = useState<
+    Array<{ conversationUuid: string; userId: number; userName: string }>
+  >([]);
   const socketRef = useRef<ChatSocket | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const typingParticipantRef = useRef<number | null>(null);
+  const typingTargetRef = useRef<
+    { type: "direct"; participantUserId: number } | { type: "group"; conversationUuid: string } | null
+  >(null);
   const isTypingRef = useRef(false);
 
   useEffect(() => {
@@ -193,6 +248,62 @@ export function ChatLayout() {
 
     socket.on("direct_message:read", () => {
       void queryClient.invalidateQueries({ queryKey: ["direct-messages"] });
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+    });
+
+    socket.on("group_chat:created", () => {
+      void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+    });
+
+    socket.on("group_message:new", (incomingMessage: DirectMessage) => {
+      setGroupTypingUsers((prev) =>
+        prev.filter(
+          (entry) =>
+            !(
+              entry.conversationUuid === incomingMessage.conversationUuid &&
+              entry.userId === incomingMessage.senderId
+            ),
+        ),
+      );
+      queryClient.setQueriesData<DirectChatsResponse>(
+        { queryKey: ["direct-chats"] },
+        (current) => {
+          if (!current) return current;
+
+          return {
+            ...current,
+            data: current.data.map((chat) => {
+              if (
+                chat.type !== "GROUP" ||
+                chat.uuid !== incomingMessage.conversationUuid
+              ) {
+                return chat;
+              }
+
+              const isOwnMessage = incomingMessage.senderUuid === user?.uuid;
+              const isActiveGroup =
+                selectedId === incomingMessage.conversationUuid;
+
+              return {
+                ...chat,
+                unreadCount: isOwnMessage || isActiveGroup
+                  ? 0
+                  : chat.unreadCount + 1,
+                lastMessage: {
+                  uuid: incomingMessage.uuid,
+                  content: incomingMessage.content,
+                  type: incomingMessage.type,
+                  createdAt: incomingMessage.createdAt,
+                },
+                updatedAt: incomingMessage.createdAt,
+              };
+            }),
+          };
+        },
+      );
+      void queryClient.invalidateQueries({
+        queryKey: ["group-messages", incomingMessage.conversationUuid],
+      });
       void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
     });
 
@@ -236,12 +347,57 @@ export function ChatLayout() {
       },
     );
 
+    socket.on(
+      "group_message:typing",
+      (payload: {
+        conversationUuid?: string;
+        fromUserId?: number;
+        fromUserName?: string;
+        isTyping?: boolean;
+      }) => {
+        if (
+          typeof payload.conversationUuid !== "string" ||
+          typeof payload.fromUserId !== "number" ||
+          typeof payload.fromUserName !== "string"
+        ) {
+          return;
+        }
+
+        const conversationUuid = payload.conversationUuid;
+        const fromUserId = payload.fromUserId;
+        const fromUserName = payload.fromUserName;
+
+        setGroupTypingUsers((prev) => {
+          const filtered = prev.filter(
+            (entry) =>
+              !(
+                entry.conversationUuid === conversationUuid &&
+                entry.userId === fromUserId
+              ),
+          );
+
+          if (!payload.isTyping) {
+            return filtered;
+          }
+
+          return [
+            ...filtered,
+            {
+              conversationUuid,
+              userId: fromUserId,
+              userName: fromUserName,
+            },
+          ];
+        });
+      },
+    );
+
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       socketRef.current = null;
       socket.disconnect();
     };
-  }, [token, queryClient]);
+  }, [token, queryClient, selectedId, user?.uuid]);
 
   useEffect(() => {
     return () => {
@@ -253,10 +409,9 @@ export function ChatLayout() {
   const { data: directChatsData, isLoading: isLoadingDirectChats } =
     useDirectChats(1, debouncedSearch, activeFilter);
   const directChatsByMemberUuid = new Map(
-    (directChatsData?.data ?? []).map((chat) => [
-      chat.otherParticipant.uuid,
-      chat,
-    ]),
+    (directChatsData?.data ?? [])
+      .filter((chat): chat is DirectChat => chat.type === "DIRECT")
+      .map((chat) => [chat.otherParticipant.uuid, chat]),
   );
 
   const baseConversations =
@@ -269,18 +424,27 @@ export function ChatLayout() {
               directChatsByMemberUuid.get(member.uuid),
             ),
           )
-      : (directChatsData?.data ?? []).map((chat) =>
-          directChatToConversation(
-            chat,
-            GRADIENTS[chat.otherParticipant.id % GRADIENTS.length],
-          ),
+      : (directChatsData?.data ?? []).map((chat, index) =>
+          chat.type === "GROUP"
+            ? groupChatToConversation(chat, GRADIENTS[index % GRADIENTS.length])
+            : directChatToConversation(
+                chat,
+                GRADIENTS[chat.otherParticipant.id % GRADIENTS.length],
+              ),
         );
 
   const conversations = baseConversations
     .map((conversation) => ({
       ...conversation,
       online: onlineUserIds.includes(conversation.memberId),
-      isTyping: typingUserIds.includes(conversation.memberId),
+      isTyping: conversation.memberId === 0
+        ? groupTypingUsers.some((entry) => entry.conversationUuid === conversation.id)
+        : typingUserIds.includes(conversation.memberId),
+      onlineParticipantNames: (conversation as ChatConversation).participants
+        ?.filter((p) => onlineUserIds.includes(p.id))
+        .map((p) => p.name.split(" ")[0]),
+      onlineParticipants: (conversation as ChatConversation).participants
+        ?.filter((p) => onlineUserIds.includes(p.id)),
     }))
     .sort((a, b) => {
       if (a.latestActivityAt !== b.latestActivityAt) {
@@ -293,23 +457,47 @@ export function ChatLayout() {
   const effectiveSelectedId =
     selectedId && conversations.some((conversation) => conversation.id === selectedId)
       ? selectedId
-      : conversations[0]?.id ?? null;
+      : activeFilter === "ALL"
+        ? (conversations[0]?.id ?? null)
+        : null;
   const selected = conversations.find((c) => c.id === effectiveSelectedId);
-  const { data: messagesData, isLoading: isLoadingMessages } =
-    useDirectMessages(selected?.memberId);
-  const sendDirectMessage = useSendDirectMessage(selected?.memberId);
-  const uploadDirectMessage = useUploadDirectMessage(selected?.memberId);
+  const isGroup = selected?.memberId === 0;
+  const directMemberId = !isGroup && selected?.memberId ? selected.memberId : undefined;
+  const groupConvUuid = isGroup ? selected?.id : undefined;
+
+  const { data: directMessagesData, isLoading: isLoadingDirectMessages } =
+    useDirectMessages(directMemberId);
+  const { data: groupMessagesData, isLoading: isLoadingGroupMessages } =
+    useGroupMessages(groupConvUuid);
+
+  const messagesData = isGroup ? groupMessagesData : directMessagesData;
+  const isLoadingMessages = isGroup ? isLoadingGroupMessages : isLoadingDirectMessages;
+
+  const sendDirectMessage = useSendDirectMessage(directMemberId);
+  const uploadDirectMessage = useUploadDirectMessage(directMemberId);
+  const sendGroupMessage = useSendGroupMessage(groupConvUuid);
+  const uploadGroupMessage = useUploadGroupMessage(groupConvUuid);
   const markDirectChatRead = useMarkDirectChatRead();
 
-  function emitTypingState(participantUserId: number, isTyping: boolean) {
+  function emitDirectTypingState(participantUserId: number, isTyping: boolean) {
     const socket = socketRef.current;
     if (!socket) return;
     socket.emit("direct_message:typing", { participantUserId, isTyping });
   }
 
+  function emitGroupTypingState(conversationUuid: string, isTyping: boolean) {
+    const socket = socketRef.current;
+    if (!socket) return;
+    socket.emit("group_message:typing", { conversationUuid, isTyping });
+  }
+
   function stopTyping() {
-    if (!isTypingRef.current || !typingParticipantRef.current) return;
-    emitTypingState(typingParticipantRef.current, false);
+    if (!isTypingRef.current || !typingTargetRef.current) return;
+    if (typingTargetRef.current.type === "direct") {
+      emitDirectTypingState(typingTargetRef.current.participantUserId, false);
+    } else {
+      emitGroupTypingState(typingTargetRef.current.conversationUuid, false);
+    }
     isTypingRef.current = false;
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -320,9 +508,15 @@ export function ChatLayout() {
   function handleMessageChange(value: string) {
     setMessage(value);
 
-    if (!selected?.memberId) return;
+    if (!selected) return;
 
-    typingParticipantRef.current = selected.memberId;
+    if (selected.memberId === 0) {
+      typingTargetRef.current = { type: "group", conversationUuid: selected.id };
+    } else if (selected.memberId) {
+      typingTargetRef.current = { type: "direct", participantUserId: selected.memberId };
+    } else {
+      return;
+    }
 
     if (!value.trim()) {
       stopTyping();
@@ -330,7 +524,11 @@ export function ChatLayout() {
     }
 
     if (!isTypingRef.current) {
-      emitTypingState(selected.memberId, true);
+      if (typingTargetRef.current.type === "direct") {
+        emitDirectTypingState(typingTargetRef.current.participantUserId, true);
+      } else {
+        emitGroupTypingState(typingTargetRef.current.conversationUuid, true);
+      }
       isTypingRef.current = true;
     }
 
@@ -348,42 +546,76 @@ export function ChatLayout() {
   }
 
   const selectedMemberId = selected?.memberId;
+  const selectedConversationId = selected?.id;
 
   useEffect(() => {
     stopTyping();
-    typingParticipantRef.current = selectedMemberId ?? null;
+    if (!selected) {
+      typingTargetRef.current = null;
+    } else if (selected.memberId === 0) {
+      typingTargetRef.current = { type: "group", conversationUuid: selected.id };
+    } else if (selected.memberId) {
+      typingTargetRef.current = { type: "direct", participantUserId: selected.memberId };
+    } else {
+      typingTargetRef.current = null;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMemberId]);
+  }, [selectedMemberId, selectedConversationId]);
 
   useEffect(() => {
-    if (!selected?.memberId || isLoadingMessages || !messagesData?.data?.length)
-      return;
-
-    const hasUnreadMessages = conversations.some(
-      (c) => c.memberId === selected.memberId && c.unread > 0,
-    );
-
-    if (!hasUnreadMessages || markDirectChatRead.isPending) return;
+    if (!selected?.memberId || selected.memberId === 0 || isLoadingMessages || !messagesData?.data?.length) return;
+    if (!selected.unread || markDirectChatRead.isPending) return;
 
     markDirectChatRead.mutate(selected.memberId);
   }, [
-    conversations,
-    isLoadingMessages,
-    markDirectChatRead,
-    messagesData?.data?.length,
     selected?.memberId,
+    selected?.unread,
+    isLoadingMessages,
+    messagesData?.data?.length,
+    markDirectChatRead,
   ]);
+
+  useEffect(() => {
+    if (!selected || selected.memberId !== 0 || isLoadingMessages) return;
+    if (!selected.unread) return;
+
+    queryClient.setQueriesData<DirectChatsResponse>(
+      { queryKey: ["direct-chats"] },
+      (current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          data: current.data.map((chat) =>
+            chat.type === "GROUP" && chat.uuid === selected.id
+              ? { ...chat, unreadCount: 0 }
+              : chat,
+          ),
+        };
+      },
+    );
+    void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+  }, [selected, isLoadingMessages, queryClient]);
 
   async function sendMessage() {
     const content = message.trim();
-    if ((!content && selectedFiles.length === 0) || !selected?.memberId) return;
+    if ((!content && selectedFiles.length === 0) || !selected) return;
 
     stopTyping();
 
-    if (selectedFiles.length > 0) {
-      await uploadDirectMessage.mutateAsync({ content, files: selectedFiles });
+    if (isGroup) {
+      if (selectedFiles.length > 0) {
+        await uploadGroupMessage.mutateAsync({ content, files: selectedFiles });
+      } else if (content) {
+        await sendGroupMessage.mutateAsync(content);
+      }
     } else {
-      await sendDirectMessage.mutateAsync(content);
+      if (!selected.memberId) return;
+      if (selectedFiles.length > 0) {
+        await uploadDirectMessage.mutateAsync({ content, files: selectedFiles });
+      } else {
+        await sendDirectMessage.mutateAsync(content);
+      }
     }
 
     setMessage("");
@@ -405,6 +637,7 @@ export function ChatLayout() {
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
         onSearchChange={setSearch}
         onFilterChange={setActiveFilter}
+        onCreateGroup={() => setShowCreateGroup(true)}
       />
 
       {selected ? (
@@ -423,9 +656,17 @@ export function ChatLayout() {
           isLoadingMessages={isLoadingMessages}
           selectedFiles={selectedFiles}
           isSendingMessage={
-            sendDirectMessage.isPending || uploadDirectMessage.isPending
+            sendDirectMessage.isPending || uploadDirectMessage.isPending ||
+            sendGroupMessage.isPending || uploadGroupMessage.isPending
           }
-          isPeerTyping={typingUserIds.includes(selected.memberId)}
+          isPeerTyping={selected.memberId === 0
+            ? groupTypingUsers.some((entry) => entry.conversationUuid === selected.id)
+            : typingUserIds.includes(selected.memberId)}
+          typingNames={selected.memberId === 0
+            ? groupTypingUsers
+                .filter((entry) => entry.conversationUuid === selected.id)
+                .map((entry) => entry.userName.split(" ")[0])
+            : []}
           onMessageChange={handleMessageChange}
           onSendMessage={sendMessage}
           onFileSelect={setSelectedFiles}
@@ -438,6 +679,11 @@ export function ChatLayout() {
           <EmptyChat />
         </main>
       )}
+      <CreateGroupModal
+        open={showCreateGroup}
+        onOpenChange={setShowCreateGroup}
+        currentUserUuid={user?.uuid}
+      />
     </div>
   );
 }

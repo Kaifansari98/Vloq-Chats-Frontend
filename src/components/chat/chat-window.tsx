@@ -1,74 +1,67 @@
-"use client"
+"use client";
 
-import { useEffect, useRef, useState } from "react"
-import { motion } from "framer-motion"
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  Check,
-  Download,
-  Eye,
-  FileText,
   MoreHorizontal,
-  Minus,
   Paperclip,
   Phone,
-  Plus,
   Send,
-  Smile,
   Video,
   X,
-  FileSpreadsheet,
-  FileArchive,
-  Presentation,
-} from "lucide-react"
-import { EmojiPicker } from "frimousse"
-import type { EmojiPickerListCategoryHeaderProps, EmojiPickerListEmojiProps, EmojiPickerListRowProps } from "frimousse"
-import { Popover } from "radix-ui"
-import type { MessageAttachment } from "@/hooks/use-direct-messages"
-import { api } from "@/lib/api"
+} from "lucide-react";
+import { AttachmentDisplay } from "@/components/chat/attachment-display";
+import { EmojiPickerButton } from "./emoji-picker-button";
+import { ImagePreviewModal } from "@/components/chat/image-preview-modal";
+import type { MessageAttachment } from "@/hooks/use-direct-messages";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
 export type ChatConversation = {
-  id: string
-  memberId: number
-  name: string
-  initials: string
-  lastMessage: string
-  time: string
-  unread: number
-  latestActivityAt: number
-  online: boolean
-  isTyping: boolean
-  gradient: string
-}
+  id: string;
+  memberId: number;
+  name: string;
+  initials: string;
+  lastMessage: string;
+  time: string;
+  unread: number;
+  latestActivityAt: number;
+  online: boolean;
+  isTyping: boolean;
+  gradient: string;
+  participants?: Array<{ id: number; name: string; initials: string }>;
+  onlineParticipantNames?: string[];
+  onlineParticipants?: Array<{ id: number; name: string; initials: string }>;
+};
 
 export type ChatMessage = {
-  uuid: string
-  content: string | null
-  senderName: string
-  isOwnMessage: boolean
-  createdAt: string
-  status: "sent" | "read"
-  attachments: MessageAttachment[]
-}
+  uuid: string;
+  content: string | null;
+  senderName: string;
+  isOwnMessage: boolean;
+  createdAt: string;
+  status: "sent" | "read";
+  attachments: MessageAttachment[];
+};
 
 type ChatWindowProps = {
-  selected: ChatConversation
-  message: string
-  messages: ChatMessage[]
-  selectedFiles: File[]
-  isLoadingMessages?: boolean
-  isSendingMessage?: boolean
-  isPeerTyping?: boolean
-  onMessageChange: (value: string) => void
-  onSendMessage: () => void
-  onFileSelect: (files: File[]) => void
-  onRemoveFile: (index: number) => void
-}
+  selected: ChatConversation;
+  message: string;
+  messages: ChatMessage[];
+  selectedFiles: File[];
+  isLoadingMessages?: boolean;
+  isSendingMessage?: boolean;
+  isPeerTyping?: boolean;
+  typingNames?: string[];
+  onMessageChange: (value: string) => void;
+  onSendMessage: () => void;
+  onFileSelect: (files: File[]) => void;
+  onRemoveFile: (index: number) => void;
+};
 
 // ─── allowed file types ───────────────────────────────────────────────────────
 
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png"]
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png"];
 const ALLOWED_DOC_TYPES = [
   "application/pdf",
   "application/msword",
@@ -80,52 +73,178 @@ const ALLOWED_DOC_TYPES = [
   "application/x-zip-compressed",
   "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-]
-const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_DOC_TYPES]
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
-const MAX_FILES = 5
+];
+const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_DOC_TYPES];
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_FILES = 5;
 const FILE_INPUT_ACCEPT =
-  ".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.ppt,.pptx,image/jpeg,image/png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/zip,application/x-zip-compressed,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  ".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.ppt,.pptx,image/jpeg,image/png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/zip,application/x-zip-compressed,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 type MessageGroup = {
-  dayKey: string
-  dayLabel: string
-  messages: ChatMessage[]
+  dayKey: string;
+  dayLabel: string;
+  messages: ChatMessage[];
+};
+
+type ParticipantPreview = {
+  id: number;
+  name: string;
+  initials: string;
+};
+
+type ActiveMention = {
+  start: number;
+  end: number;
+  query: string;
+};
+
+const GROUP_AVATAR_GRADIENTS = [
+  "from-amber-500 to-orange-500",
+  "from-pink-500 to-fuchsia-500",
+  "from-violet-500 to-purple-500",
+  "from-teal-500 to-cyan-500",
+  "from-orange-500 to-red-500",
+  "from-fuchsia-500 to-pink-500",
+  "from-emerald-500 to-teal-500",
+  "from-blue-500 to-cyan-500",
+];
+
+function GroupParticipantsCluster({
+  participants,
+}: {
+  participants: ParticipantPreview[];
+}) {
+  const [hoveredParticipantId, setHoveredParticipantId] = useState<number | null>(null);
+  const visibleParticipants = participants.slice(0, 6);
+  const extraCount = participants.length - visibleParticipants.length;
+
+  if (participants.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex items-center pl-3">
+      {visibleParticipants.map((participant, index) => {
+        const isHovered = hoveredParticipantId === participant.id;
+        const gradient =
+          GROUP_AVATAR_GRADIENTS[index % GROUP_AVATAR_GRADIENTS.length];
+
+        return (
+          <div
+            key={participant.id}
+            className="relative"
+            style={{
+              marginLeft: index === 0 ? 0 : -10,
+              zIndex: visibleParticipants.length - index,
+            }}
+            onMouseEnter={() => setHoveredParticipantId(participant.id)}
+            onMouseLeave={() =>
+              setHoveredParticipantId((current) =>
+                current === participant.id ? null : current,
+              )
+            }
+          >
+            <motion.div
+              whileHover={{ y: -2, scale: 1.04 }}
+              transition={{ duration: 0.16, ease: "easeOut" }}
+              className={`flex h-8 w-8 items-center justify-center rounded-full border border-white/50 bg-linear-to-br ${gradient} text-[11px] font-semibold text-white shadow-[0_12px_24px_-16px_rgba(15,23,42,0.38)] dark:border-white/10 dark:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.85)]`}
+            >
+              {participant.initials}
+            </motion.div>
+
+            <AnimatePresence>
+              {isHovered && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.92 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.92 }}
+                  transition={{ duration: 0.16, ease: "easeOut" }}
+                  className="pointer-events-none absolute top-full left-1/2 z-20 mt-3 -translate-x-1/2"
+                >
+                  <div className="rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-medium whitespace-nowrap text-white shadow-lg dark:bg-white dark:text-slate-900">
+                    {participant.name}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+
+      {extraCount > 0 && (
+        <div
+          className="relative"
+          style={{ marginLeft: visibleParticipants.length > 0 ? -10 : 0 }}
+          onMouseEnter={() => setHoveredParticipantId(-1)}
+          onMouseLeave={() =>
+            setHoveredParticipantId((current) => (current === -1 ? null : current))
+          }
+        >
+          <motion.div
+            whileHover={{ y: -2, scale: 1.04 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-200 text-[11px] font-semibold text-slate-700 dark:border-white/10 dark:bg-[#202b4a] dark:text-slate-200"
+          >
+            +{extraCount}
+          </motion.div>
+
+          <AnimatePresence>
+            {hoveredParticipantId === -1 && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.92 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.92 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="pointer-events-none absolute top-full left-1/2 z-20 mt-3 -translate-x-1/2"
+              >
+                <div className="rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-medium whitespace-nowrap text-white shadow-lg dark:bg-white dark:text-slate-900">
+                  {extraCount} more active
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function dayKey(dateString: string) {
-  const d = new Date(dateString)
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  const d = new Date(dateString);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 function formatDayLabel(dateString: string) {
-  const date = new Date(dateString)
-  const now = new Date()
-  const todayKey = dayKey(now.toISOString())
-  const msgKey = dayKey(dateString)
+  const date = new Date(dateString);
+  const now = new Date();
+  const todayKey = dayKey(now.toISOString());
+  const msgKey = dayKey(dateString);
 
-  if (msgKey === todayKey) return "Today"
+  if (msgKey === todayKey) return "Today";
 
-  const yesterday = new Date(now)
-  yesterday.setDate(yesterday.getDate() - 1)
-  if (msgKey === dayKey(yesterday.toISOString())) return "Yesterday"
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (msgKey === dayKey(yesterday.toISOString())) return "Yesterday";
 
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86_400_000)
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
   if (diffDays < 7) {
-    return new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date)
+    return new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date);
   }
 
   if (date.getFullYear() === now.getFullYear()) {
-    return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(date)
+    return new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      day: "numeric",
+    }).format(date);
   }
 
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
-  }).format(date)
+  }).format(date);
 }
 
 function formatMessageTime(dateString: string) {
@@ -133,106 +252,55 @@ function formatMessageTime(dateString: string) {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-  }).format(new Date(dateString))
-}
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }).format(new Date(dateString));
 }
 
 function isImageFileType(mimeType: string) {
-  return mimeType.startsWith("image/")
+  return mimeType.startsWith("image/");
 }
 
 function getFileExtension(fileName: string) {
-  const parts = fileName.split(".")
-  if (parts.length < 2) return "FILE"
-  return parts.at(-1)?.toUpperCase() ?? "FILE"
-}
-
-function getImageAttachmentRows(images: MessageAttachment[]) {
-  if (images.length <= 1) return [images]
-  if (images.length === 2) return [images]
-  if (images.length === 3) return [images]
-  if (images.length === 4) return [images.slice(0, 2), images.slice(2, 4)]
-  return [images.slice(0, 3), images.slice(3, 5)]
-}
-
-function getDocAccent(mimeType: string) {
-  if (mimeType === "application/pdf") {
-    return {
-      icon: "text-rose-500 dark:text-rose-400",
-      badge: "text-rose-700",
-    }
-  }
-
-  if (
-    mimeType === "text/csv" ||
-    mimeType.includes("sheet") ||
-    mimeType.includes("excel")
-  ) {
-    return {
-      icon: "text-emerald-500 dark:text-emerald-400",
-      badge: "text-emerald-700",
-    }
-  }
-
-  if (mimeType.includes("presentation") || mimeType.includes("powerpoint")) {
-    return {
-      icon: "text-orange-500 dark:text-orange-400",
-      badge: "text-orange-700",
-    }
-  }
-
-  if (mimeType.includes("zip")) {
-    return {
-      icon: "text-amber-500 dark:text-amber-400",
-      badge: "text-amber-700",
-    }
-  }
-
-  return {
-    icon: "text-slate-500 dark:text-slate-300",
-    badge: "text-slate-700",
-  }
-}
-
-function getDocumentLabel(mimeType: string) {
-  if (mimeType === "application/pdf") return "Portable Document"
-  if (mimeType === "text/csv") return "CSV Document"
-  if (mimeType.includes("sheet") || mimeType.includes("excel")) return "Spreadsheet"
-  if (mimeType.includes("presentation") || mimeType.includes("powerpoint"))
-    return "Presentation"
-  if (mimeType.includes("zip")) return "Compressed Archive"
-  if (mimeType.includes("word")) return "Word Document"
-  return "Document"
+  const parts = fileName.split(".");
+  if (parts.length < 2) return "FILE";
+  return parts.at(-1)?.toUpperCase() ?? "FILE";
 }
 
 function groupMessagesByDay(messages: ChatMessage[]): MessageGroup[] {
-  const groups: MessageGroup[] = []
-  let currentKey = ""
+  const groups: MessageGroup[] = [];
+  let currentKey = "";
 
   for (const msg of messages) {
-    const key = dayKey(msg.createdAt)
+    const key = dayKey(msg.createdAt);
     if (key !== currentKey) {
-      currentKey = key
-      groups.push({ dayKey: key, dayLabel: formatDayLabel(msg.createdAt), messages: [] })
+      currentKey = key;
+      groups.push({
+        dayKey: key,
+        dayLabel: formatDayLabel(msg.createdAt),
+        messages: [],
+      });
     }
-    groups[groups.length - 1].messages.push(msg)
+    groups[groups.length - 1].messages.push(msg);
   }
 
-  return groups
+  return groups;
 }
 
-function DocIconByMime({ mimeType, className }: { mimeType: string; className: string }) {
-  if (mimeType.includes("spreadsheet") || mimeType.includes("excel") || mimeType === "text/csv")
-    return <FileSpreadsheet className={className} />
-  if (mimeType.includes("zip")) return <FileArchive className={className} />
-  if (mimeType.includes("presentation") || mimeType.includes("powerpoint"))
-    return <Presentation className={className} />
-  return <FileText className={className} />
+function findActiveMention(value: string, caretIndex: number): ActiveMention | null {
+  const textBeforeCaret = value.slice(0, caretIndex);
+  const match = /(^|\s)@([^\s@]*)$/.exec(textBeforeCaret);
+
+  if (!match) {
+    return null;
+  }
+
+  const query = match[2] ?? "";
+  const start = caretIndex - query.length - 1;
+
+  return {
+    start,
+    end: caretIndex,
+    query,
+  };
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -246,15 +314,15 @@ function DateSeparator({ label }: { label: string }) {
       </span>
       <div className="flex-1 h-px bg-slate-200 dark:bg-white/6" />
     </div>
-  )
+  );
 }
 
 function TypingDots({
   dotClassName,
   gapClassName = "gap-1.5",
 }: {
-  dotClassName: string
-  gapClassName?: string
+  dotClassName: string;
+  gapClassName?: string;
 }) {
   return (
     <div className={`flex items-end ${gapClassName}`}>
@@ -273,441 +341,7 @@ function TypingDots({
         />
       ))}
     </div>
-  )
-}
-
-function ImageAttachmentTile({
-  attachment,
-  onPreview,
-}: {
-  attachment: MessageAttachment
-  onPreview?: (attachment: MessageAttachment) => void
-}) {
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [isDownloading, setIsDownloading] = useState(false)
-  const [downloadProgress, setDownloadProgress] = useState(0)
-  const [downloadError, setDownloadError] = useState<string | null>(null)
-  const [isDownloadComplete, setIsDownloadComplete] = useState(false)
-
-  async function handleDownload(event: React.MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation()
-
-    if (isDownloading) return
-
-    setIsDownloading(true)
-    setDownloadProgress(0)
-    setDownloadError(null)
-    setIsDownloadComplete(false)
-
-    try {
-      const response = await api.get<Blob>(
-        `/chats/direct/messages/attachments/${attachment.uuid}/download`,
-        {
-          responseType: "blob",
-          onDownloadProgress: (progressEvent) => {
-            if (!progressEvent.total || progressEvent.total <= 0) return
-
-            setDownloadProgress(
-              Math.min(100, Math.round((progressEvent.loaded / progressEvent.total) * 100)),
-            )
-          },
-        },
-      )
-
-      const blob = response.data
-      const objectUrl = URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.href = objectUrl
-      link.download = attachment.name
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(objectUrl)
-      setDownloadProgress(100)
-      setIsDownloadComplete(true)
-
-      window.setTimeout(() => {
-        setIsDownloading(false)
-        setDownloadProgress(0)
-        setIsDownloadComplete(false)
-      }, 1100)
-    } catch {
-      setDownloadError("Download failed")
-      setIsDownloading(false)
-      setDownloadProgress(0)
-    }
-  }
-
-  return (
-    <div className="relative h-52 w-52 overflow-hidden rounded-xl bg-slate-200 dark:bg-white/8">
-      <button
-        type="button"
-        onClick={() => onPreview?.(attachment)}
-        className="absolute inset-0 z-0"
-        aria-label={`Preview ${attachment.name}`}
-      >
-      </button>
-      {!isLoaded && (
-        <div className="absolute inset-0 overflow-hidden rounded-xl bg-slate-200 dark:bg-white/8">
-          <motion.div
-            className="absolute inset-0 bg-linear-to-r from-transparent via-white/60 to-transparent dark:via-white/10"
-            initial={{ x: "-100%" }}
-            animate={{ x: "100%" }}
-            transition={{
-              duration: 1.2,
-              ease: "easeInOut",
-              repeat: Number.POSITIVE_INFINITY,
-              repeatDelay: 0.1,
-            }}
-          />
-          <motion.div
-            className="absolute inset-0 bg-slate-300/50 dark:bg-white/6"
-            animate={{ opacity: [0.45, 0.7, 0.45] }}
-            transition={{
-              duration: 1.6,
-              ease: "easeInOut",
-              repeat: Number.POSITIVE_INFINITY,
-            }}
-          />
-        </div>
-      )}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={attachment.url}
-        alt={attachment.name}
-        onLoad={() => setIsLoaded(true)}
-        onError={() => setIsLoaded(true)}
-        className={`relative z-10 h-52 w-52 rounded-xl object-cover transition-opacity ${
-          isLoaded ? "opacity-100" : "opacity-0"
-        }`}
-      />
-      <button
-        type="button"
-        onClick={handleDownload}
-        disabled={isDownloading}
-        className={`absolute right-2 top-2 z-20 flex h-10 items-center justify-center overflow-hidden rounded-full border px-2.5 text-white shadow-[0_10px_30px_rgba(15,23,42,0.28)] backdrop-blur-md transition-all duration-200 disabled:cursor-wait ${
-          downloadError
-            ? "border-rose-300/30 bg-rose-500/90 hover:bg-rose-500"
-            : isDownloadComplete
-              ? "border-emerald-300/30 bg-emerald-500/90"
-              : "border-white/15 bg-black/55 hover:bg-black/72"
-        }`}
-        aria-label={`Download ${attachment.name}`}
-        title={downloadError ?? `Download ${attachment.name}`}
-      >
-        {isDownloading ? (
-          <motion.div
-            initial={{ width: 40 }}
-            animate={{ width: 76 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="relative flex h-7 items-center overflow-hidden rounded-full"
-          >
-            <motion.div
-              className="absolute inset-y-0 left-0 rounded-full bg-white/16"
-              initial={{ width: 0 }}
-              animate={{ width: `${downloadProgress}%` }}
-              transition={{ ease: "easeOut", duration: 0.2 }}
-            />
-            <motion.div
-              className="absolute inset-y-0 left-0 w-10 bg-linear-to-r from-transparent via-white/45 to-transparent"
-              animate={{ x: ["-120%", "220%"] }}
-              transition={{
-                duration: 1,
-                ease: "easeInOut",
-                repeat: Number.POSITIVE_INFINITY,
-              }}
-            />
-            <div className="relative z-10 flex w-full items-center justify-center gap-1.5 px-2">
-              <Download className="h-3.5 w-3.5" />
-              <motion.span
-                key={downloadProgress}
-                initial={{ scale: 0.96, opacity: 0.75 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="text-[10px] font-semibold tabular-nums tracking-[0.02em]"
-              >
-                {downloadProgress}%
-              </motion.span>
-            </div>
-          </motion.div>
-        ) : isDownloadComplete ? (
-          <motion.div
-            initial={{ scale: 0.85, opacity: 0.6 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="flex items-center gap-1.5"
-          >
-            <Check className="h-4 w-4" />
-            <span className="text-[10px] font-semibold">Saved</span>
-          </motion.div>
-        ) : downloadError ? (
-          <motion.span
-            initial={{ scale: 0.92, opacity: 0.7 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="text-[10px] font-semibold"
-          >
-            Retry
-          </motion.span>
-        ) : (
-          <motion.div
-            whileHover={{ y: -0.5 }}
-            whileTap={{ scale: 0.96 }}
-            className="flex items-center gap-1.5"
-          >
-            <Download className="h-4 w-4" />
-            <span className="text-[10px] font-semibold">Save</span>
-          </motion.div>
-        )}
-      </button>
-    </div>
-  )
-}
-
-function AttachmentDisplay({
-  attachments,
-  isOwn,
-  imageClassName,
-  docClassName,
-  onPreviewImage,
-}: {
-  attachments: MessageAttachment[]
-  isOwn: boolean
-  imageClassName?: string
-  docClassName?: string
-  onPreviewImage?: (attachment: MessageAttachment) => void
-}) {
-  if (attachments.length === 0) return null
-
-  const images = attachments.filter((a) => a.attachmentType === "IMAGE")
-  const docs = attachments.filter((a) => a.attachmentType !== "IMAGE")
-  const imageRows = getImageAttachmentRows(images)
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      {images.length > 0 && (
-        <div className={`${imageClassName ?? ""} flex flex-col gap-1.5`}>
-          {imageRows.map((row, rowIndex) => (
-            <div
-              key={`row-${rowIndex}`}
-              className={`flex gap-1.5 ${
-                images.length === 5 && rowIndex === 1
-                  ? isOwn
-                    ? "justify-end"
-                    : "justify-start"
-                  : ""
-              }`}
-            >
-              {row.map((img) => (
-                <ImageAttachmentTile
-                  key={img.uuid}
-                  attachment={img}
-                  onPreview={onPreviewImage}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-      {docs.map((doc) => {
-        const isPdf = doc.mimeType === "application/pdf"
-        const docAccent = getDocAccent(doc.mimeType)
-        const docExtension = getFileExtension(doc.name)
-        const docLabel = getDocumentLabel(doc.mimeType)
-
-        if (isPdf) {
-          return (
-            <div
-              key={doc.uuid}
-              className={`max-w-[390px] overflow-hidden rounded-[28px] border p-4 shadow-[0_16px_50px_-30px_rgba(15,23,42,0.35)] ${
-                isOwn
-                  ? "border-white/12 bg-linear-to-br from-blue-500 to-blue-600 text-white"
-                  : "border-slate-200/90 bg-white dark:border-white/10 dark:bg-[#0f172a]"
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div
-                  className={`relative flex h-[104px] w-[104px] shrink-0 flex-col items-center justify-center rounded-[28px] ${
-                    isOwn
-                      ? "bg-white/12 ring-1 ring-white/10"
-                      : "bg-linear-to-b from-slate-50 to-slate-100 ring-1 ring-slate-200/80 dark:from-white/8 dark:to-white/5 dark:ring-white/8"
-                  }`}
-                >
-                  <FileText
-                    className={`h-10 w-10 ${
-                      isOwn ? "text-white" : docAccent.icon
-                    }`}
-                  />
-                  <div
-                    className={`absolute bottom-3 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-[0.24em] ${
-                      isOwn
-                        ? "bg-white text-blue-700"
-                        : `bg-white shadow-sm dark:bg-slate-50 ${docAccent.badge}`
-                    }`}
-                  >
-                    {docExtension}
-                  </div>
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`truncate text-[15px] font-semibold leading-tight ${
-                      isOwn ? "text-white" : "text-slate-900 dark:text-slate-100"
-                    }`}
-                  >
-                    {doc.name}
-                  </p>
-                  <div
-                    className={`mt-2 flex items-center gap-2 text-[12px] ${
-                      isOwn ? "text-blue-100/90" : "text-slate-500 dark:text-slate-400"
-                    }`}
-                  >
-                    <span>{formatBytes(doc.sizeBytes)}</span>
-                    <span
-                      className={`h-1 w-1 rounded-full ${
-                        isOwn ? "bg-blue-100/70" : "bg-slate-300 dark:bg-slate-600"
-                      }`}
-                    />
-                    <span>{docLabel}</span>
-                  </div>
-
-                  <div className="mt-4 flex gap-2">
-                    <a
-                      href={doc.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`inline-flex h-11 items-center gap-2 rounded-full px-4 text-[12px] font-semibold transition-colors ${
-                        isOwn
-                          ? "bg-white/12 text-white hover:bg-white/18"
-                          : "bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-white/6 dark:text-slate-100 dark:hover:bg-white/10"
-                      }`}
-                    >
-                      <Eye className="h-4 w-4" />
-                      Preview
-                    </a>
-                    <a
-                      href={doc.url}
-                      download={doc.name}
-                      className={`inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full px-4 text-[12px] font-semibold transition-colors ${
-                        isOwn
-                          ? "bg-white text-blue-700 hover:bg-blue-50"
-                          : "bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-                      }`}
-                    >
-                      <Download className="h-4 w-4" />
-                      Download
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        }
-
-        return (
-          <a
-            key={doc.uuid}
-            href={doc.url}
-            download={doc.name}
-            className={`${docClassName ?? ""} flex max-w-[300px] items-center gap-3 rounded-2xl border px-3.5 py-3 transition-colors ${
-              isOwn
-                ? "border-white/10 bg-blue-600/40 hover:bg-blue-600/55"
-                : "border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-white/8 dark:bg-white/8 dark:hover:bg-white/12"
-            }`}
-          >
-            <div
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
-                isOwn ? "bg-white/12" : "bg-white ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/8"
-              }`}
-            >
-              <DocIconByMime
-                mimeType={doc.mimeType}
-                className={`h-5 w-5 shrink-0 ${isOwn ? "text-blue-100" : docAccent.icon}`}
-              />
-            </div>
-            <div className="min-w-0">
-              <p className={`truncate text-[12px] font-semibold leading-tight ${isOwn ? "text-white" : "text-slate-800 dark:text-slate-100"}`}>
-                {doc.name}
-              </p>
-              <p className={`mt-1 text-[10px] ${isOwn ? "text-blue-200" : "text-slate-400 dark:text-slate-500"}`}>
-                {formatBytes(doc.sizeBytes)} · {docLabel}
-              </p>
-            </div>
-          </a>
-        )
-      })}
-    </div>
-  )
-}
-
-function ImagePreviewModal({
-  attachment,
-  zoom,
-  onClose,
-  onZoomIn,
-  onZoomOut,
-}: {
-  attachment: MessageAttachment
-  zoom: number
-  onClose: () => void
-  onZoomIn: () => void
-  onZoomOut: () => void
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
-      role="presentation"
-    >
-      <div className="absolute right-6 top-6">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-900 shadow-lg transition-transform hover:scale-[1.02]"
-          aria-label="Close image preview"
-        >
-          <X className="h-7 w-7" />
-        </button>
-      </div>
-
-      <div className="absolute bottom-6 right-6 flex flex-col gap-3">
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            onZoomIn()
-          }}
-          className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-900 shadow-lg transition-transform hover:scale-[1.02]"
-          aria-label="Zoom in"
-        >
-          <Plus className="h-7 w-7" />
-        </button>
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            onZoomOut()
-          }}
-          className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-900 shadow-lg transition-transform hover:scale-[1.02]"
-          aria-label="Zoom out"
-        >
-          <Minus className="h-7 w-7" />
-        </button>
-      </div>
-
-      <div
-        className="flex h-full w-full items-center justify-center p-8 sm:p-16"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex max-h-full max-w-[min(92vw,1400px)] items-center justify-center overflow-auto rounded-[28px]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={attachment.url}
-            alt={attachment.name}
-            className="max-h-[82vh] w-auto rounded-[28px] object-contain shadow-[0_18px_70px_rgba(0,0,0,0.45)] transition-transform duration-200"
-            style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
-          />
-        </div>
-      </div>
-    </div>
-  )
+  );
 }
 
 // Chip shown in the input area for a selected (not yet sent) file
@@ -715,32 +349,36 @@ function SelectedFileChip({
   file,
   onRemove,
 }: {
-  file: File
-  onRemove: () => void
+  file: File;
+  onRemove: () => void;
 }) {
-  const isImage = isImageFileType(file.type)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const isImage = isImageFileType(file.type);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isImage) return
+    if (!isImage) return;
 
-    const reader = new FileReader()
+    const reader = new FileReader();
 
     reader.onload = () => {
       if (typeof reader.result === "string") {
-        setPreviewUrl(reader.result)
+        setPreviewUrl(reader.result);
       }
-    }
+    };
 
-    reader.readAsDataURL(file)
-  }, [file, isImage])
+    reader.readAsDataURL(file);
+  }, [file, isImage]);
 
   return (
     <div className="relative group shrink-0">
       {isImage && previewUrl ? (
         <div className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 dark:border-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={previewUrl} alt={file.name} className="w-full h-full object-cover" />
+          <img
+            src={previewUrl}
+            alt={file.name}
+            className="w-full h-full object-cover"
+          />
         </div>
       ) : (
         <div className="flex h-16 w-16 items-center justify-center bg-slate-100 dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-lg px-2">
@@ -758,49 +396,7 @@ function SelectedFileChip({
         <X className="w-2.5 h-2.5" />
       </button>
     </div>
-  )
-}
-
-// ─── emoji picker list components ────────────────────────────────────────────
-
-function EmojiCategoryHeader({ category, ...props }: EmojiPickerListCategoryHeaderProps) {
-  return (
-    <div
-      {...props}
-      className="px-1 pt-3 pb-1.5 text-[13px] font-semibold text-slate-700 dark:text-slate-200"
-    >
-      {category.label}
-    </div>
-  )
-}
-
-function EmojiRow({ children, ...props }: EmojiPickerListRowProps) {
-  return (
-    <div {...props} className="flex items-center">
-      {children}
-    </div>
-  )
-}
-
-function EmojiButton({ emoji, ...props }: EmojiPickerListEmojiProps) {
-  return (
-    <button
-      {...props}
-      className={`w-[42px] h-[42px] flex items-center justify-center text-[24px] rounded-xl cursor-pointer transition-colors ${
-        emoji.isActive
-          ? "bg-slate-100 dark:bg-white/10"
-          : "hover:bg-slate-100 dark:hover:bg-white/8"
-      }`}
-    >
-      {emoji.emoji}
-    </button>
-  )
-}
-
-const emojiListComponents = {
-  CategoryHeader: EmojiCategoryHeader,
-  Row: EmojiRow,
-  Emoji: EmojiButton,
+  );
 }
 
 // ─── main component ───────────────────────────────────────────────────────────
@@ -813,524 +409,633 @@ export function ChatWindow({
   isLoadingMessages = false,
   isSendingMessage = false,
   isPeerTyping = false,
+  typingNames = [],
   onMessageChange,
   onSendMessage,
   onFileSelect,
   onRemoveFile,
 }: ChatWindowProps) {
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [fileError, setFileError] = useState<string | null>(null)
-  const [previewImage, setPreviewImage] = useState<MessageAttachment | null>(null)
-  const [previewZoom, setPreviewZoom] = useState(1)
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<MessageAttachment | null>(
+    null,
+  );
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [activeMention, setActiveMention] = useState<ActiveMention | null>(null);
+  const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
+  const pendingSelectionRef = useRef<number | null>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages.length, isPeerTyping])
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length, isPeerTyping]);
 
   useEffect(() => {
-    if (!previewImage) return
+    if (!previewImage) return;
 
-    const previousOverflow = document.body.style.overflow
+    const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setPreviewImage(null)
-        return
+        setPreviewImage(null);
+        return;
       }
 
       if (event.key === "+" || event.key === "=") {
-        setPreviewZoom((current) => Math.min(current + 0.2, 3))
+        setPreviewZoom((current) => Math.min(current + 0.2, 3));
       }
 
       if (event.key === "-") {
-        setPreviewZoom((current) => Math.max(current - 0.2, 0.8))
+        setPreviewZoom((current) => Math.max(current - 0.2, 0.8));
       }
-    }
+    };
 
-    document.body.style.overflow = "hidden"
-    window.addEventListener("keydown", handleKeyDown)
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [previewImage])
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [previewImage]);
 
   function openPreviewImage(attachment: MessageAttachment) {
-    setPreviewImage(attachment)
-    setPreviewZoom(1)
+    setPreviewImage(attachment);
+    setPreviewZoom(1);
   }
 
   function closePreviewImage() {
-    setPreviewImage(null)
-    setPreviewZoom(1)
+    setPreviewImage(null);
+    setPreviewZoom(1);
   }
 
   function zoomPreviewIn() {
-    setPreviewZoom((current) => Math.min(current + 0.2, 3))
+    setPreviewZoom((current) => Math.min(current + 0.2, 3));
   }
 
   function zoomPreviewOut() {
-    setPreviewZoom((current) => Math.max(current - 0.2, 0.8))
+    setPreviewZoom((current) => Math.max(current - 0.2, 0.8));
   }
 
   function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const incoming = Array.from(e.target.files ?? [])
-    e.target.value = "" // reset so same file can be re-selected
-    setFileError(null)
+    const incoming = Array.from(e.target.files ?? []);
+    e.target.value = ""; // reset so same file can be re-selected
+    setFileError(null);
 
-    if (incoming.length === 0) return
+    if (incoming.length === 0) return;
 
-    const valid: File[] = []
-    const errors: string[] = []
+    const valid: File[] = [];
+    const errors: string[] = [];
 
     for (const file of incoming) {
       if (!ALLOWED_TYPES.includes(file.type)) {
-        errors.push(`"${file.name}" is not a supported file type`)
-        continue
+        errors.push(`"${file.name}" is not a supported file type`);
+        continue;
       }
       if (file.size > MAX_FILE_SIZE_BYTES) {
-        errors.push(`"${file.name}" is larger than 10 MB`)
-        continue
+        errors.push(`"${file.name}" is larger than 10 MB`);
+        continue;
       }
-      valid.push(file)
+      valid.push(file);
     }
 
-    const existingKeys = new Set(selectedFiles.map((file) => `${file.name}-${file.size}-${file.type}`))
+    const existingKeys = new Set(
+      selectedFiles.map((file) => `${file.name}-${file.size}-${file.type}`),
+    );
     const deduped = valid.filter((file) => {
-      const key = `${file.name}-${file.size}-${file.type}`
-      if (existingKeys.has(key)) return false
-      existingKeys.add(key)
-      return true
-    })
+      const key = `${file.name}-${file.size}-${file.type}`;
+      if (existingKeys.has(key)) return false;
+      existingKeys.add(key);
+      return true;
+    });
 
     if (selectedFiles.length + deduped.length > MAX_FILES) {
-      errors.push("You can attach up to 5 files in one message")
+      errors.push("You can attach up to 5 files in one message");
     }
 
-    const combined = [...selectedFiles, ...deduped].slice(0, MAX_FILES)
-    onFileSelect(combined)
+    const combined = [...selectedFiles, ...deduped].slice(0, MAX_FILES);
+    onFileSelect(combined);
 
     if (errors.length > 0) {
-      setFileError(errors[0])
+      setFileError(errors[0]);
     }
   }
 
-  const canSend = (message.trim().length > 0 || selectedFiles.length > 0) && !isSendingMessage
+  const groupMembers = selected.participants ?? [];
+  const filteredMentionMembers = activeMention
+    ? groupMembers.filter((participant) => {
+        if (!activeMention.query.trim()) {
+          return true;
+        }
+
+        const normalizedQuery = activeMention.query.trim().toLowerCase();
+        return (
+          participant.name.toLowerCase().includes(normalizedQuery) ||
+          participant.initials.toLowerCase().includes(normalizedQuery)
+        );
+      })
+    : [];
+  const activeMentionIndex = Math.min(
+    highlightedMentionIndex,
+    Math.max(filteredMentionMembers.length - 1, 0),
+  );
+
+  useEffect(() => {
+    if (pendingSelectionRef.current === null || !textareaRef.current) return;
+
+    const selection = pendingSelectionRef.current;
+    pendingSelectionRef.current = null;
+    textareaRef.current.focus();
+    textareaRef.current.setSelectionRange(selection, selection);
+  }, [message]);
+
+  function syncMentionState(nextValue: string, caretIndex: number | null) {
+    if (!isGroup || caretIndex === null) {
+      setActiveMention(null);
+      setHighlightedMentionIndex(0);
+      return;
+    }
+
+    setActiveMention(findActiveMention(nextValue, caretIndex));
+    setHighlightedMentionIndex(0);
+  }
+
+  function handleComposerChange(value: string) {
+    onMessageChange(value);
+    const caretIndex = textareaRef.current?.selectionStart ?? value.length;
+    syncMentionState(value, caretIndex);
+  }
+
+  function insertMention(participant: ParticipantPreview) {
+    if (!activeMention) return;
+
+    const nextValue =
+      `${message.slice(0, activeMention.start)}@${participant.name} ` +
+      message.slice(activeMention.end);
+    const nextCaretIndex = activeMention.start + participant.name.length + 2;
+
+    pendingSelectionRef.current = nextCaretIndex;
+    onMessageChange(nextValue);
+    setActiveMention(null);
+  }
+
+  const canSend =
+    (message.trim().length > 0 || selectedFiles.length > 0) &&
+    !isSendingMessage;
+
+  const isGroup = selected.memberId === 0;
+  const activeParticipantLabel = (selected.onlineParticipants ?? [])
+    .map((participant) => participant.name.split(" ")[0])
+    .join(", ");
+  const typingLabel =
+    typingNames.length > 1
+      ? `${typingNames[0]} and ${typingNames.length - 1} others are typing...`
+      : typingNames.length === 1
+        ? `${typingNames[0]} is typing...`
+        : "typing something...";
+  const typingActorLabel = typingNames[0] ?? selected.name;
 
   const statusLabel = isPeerTyping
-    ? "typing something..."
+    ? typingLabel
     : selected.online
       ? "Active now"
-      : "Offline"
+      : "Offline";
 
-  const showTypingBubble = isPeerTyping && !isLoadingMessages
-  const groups = groupMessagesByDay(messages)
+  const showTypingBubble = isPeerTyping && !isLoadingMessages;
+  const groups = groupMessagesByDay(messages);
 
   const lastReadOwnMessageUuid =
-    [...messages].reverse().find((m) => m.isOwnMessage && m.status === "read")?.uuid ?? null
+    [...messages].reverse().find((m) => m.isOwnMessage && m.status === "read")
+      ?.uuid ?? null;
 
   return (
     <>
       <main className="flex-1 flex flex-col min-w-0">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 h-[68px] border-b border-slate-200 dark:border-white/6 bg-white dark:bg-[#070d1e] shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div
-              className={`w-9 h-9 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-[11px] font-semibold text-white`}
-            >
-              {selected.initials}
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 h-[68px] border-b border-slate-200 dark:border-white/6 bg-white dark:bg-[#070d1e] shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div
+                className={`w-9 h-9 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-[11px] font-semibold text-white`}
+              >
+                {selected.initials}
+              </div>
+              {!isGroup && selected.online && (
+                <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 rounded-full border-2 border-white dark:border-[#070d1e]" />
+              )}
             </div>
-            {selected.online && (
-              <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 rounded-full border-2 border-white dark:border-[#070d1e]" />
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white leading-none">
+                {selected.name}
+              </p>
+              <div className="mt-1 flex items-center gap-2">
+                {isGroup ? (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[520px]">
+                    {activeParticipantLabel || "No active users"}
+                  </p>
+                ) : (
+                  <p
+                    className={`text-[11px] transition-colors ${
+                      isPeerTyping
+                        ? "text-blue-500 dark:text-blue-400"
+                        : "text-slate-400 dark:text-slate-600"
+                    }`}
+                  >
+                    {statusLabel}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {isGroup ? (
+              <GroupParticipantsCluster participants={selected.participants ?? []} />
+            ) : (
+              [Phone, Video, MoreHorizontal].map((Icon, i) => (
+                <button
+                  key={i}
+                  className="w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+                >
+                  <Icon className="w-4 h-4 text-slate-400 dark:text-slate-600" />
+                </button>
+              ))
             )}
           </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-900 dark:text-white leading-none">
-              {selected.name}
-            </p>
-            <div className="mt-1 flex items-center gap-2">
-              <p
-                className={`text-[11px] transition-colors ${
-                  isPeerTyping
-                    ? "text-blue-500 dark:text-blue-400"
-                    : "text-slate-400 dark:text-slate-600"
-                }`}
-              >
-                {statusLabel}
-              </p>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          {isLoadingMessages ? (
+            <div className="h-full flex items-center justify-center text-[12px] text-slate-400 dark:text-slate-600">
+              Loading messages...
             </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          {[Phone, Video, MoreHorizontal].map((Icon, i) => (
-            <button
-              key={i}
-              className="w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
-            >
-              <Icon className="w-4 h-4 text-slate-400 dark:text-slate-600" />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        {isLoadingMessages ? (
-          <div className="h-full flex items-center justify-center text-[12px] text-slate-400 dark:text-slate-600">
-            Loading messages...
-          </div>
-        ) : messages.length > 0 ? (
-          <div>
-            {groups.map((group) => (
-              <div key={group.dayKey}>
-                <DateSeparator label={group.dayLabel} />
-                <div className="space-y-1">
-                  {group.messages.map((chatMessage) => (
-                    <div
-                      key={chatMessage.uuid}
-                      className={`flex flex-col ${chatMessage.isOwnMessage ? "items-end" : "items-start"}`}
-                    >
-                      {chatMessage.attachments.some((attachment) => attachment.attachmentType === "IMAGE") && (
-                        <AttachmentDisplay
-                          attachments={chatMessage.attachments.filter(
-                            (attachment) => attachment.attachmentType === "IMAGE",
-                          )}
-                          isOwn={chatMessage.isOwnMessage}
-                          imageClassName={`mb-1.5 ${chatMessage.isOwnMessage ? "justify-end" : "justify-start"}`}
-                          onPreviewImage={openPreviewImage}
-                        />
-                      )}
-
-                      {chatMessage.attachments.some(
-                        (attachment) => attachment.mimeType === "application/pdf",
-                      ) && (
-                        <AttachmentDisplay
-                          attachments={chatMessage.attachments.filter(
-                            (attachment) => attachment.mimeType === "application/pdf",
-                          )}
-                          isOwn={chatMessage.isOwnMessage}
-                          docClassName="mb-1.5"
-                        />
-                      )}
-
-                      {(chatMessage.content ||
-                        chatMessage.attachments.some(
-                          (attachment) =>
-                            attachment.attachmentType !== "IMAGE" &&
-                            attachment.mimeType !== "application/pdf",
-                        )) && (
-                        <div
-                          className={`max-w-[75%] px-4 py-2.5 ${
-                            chatMessage.isOwnMessage
-                              ? "rounded-2xl rounded-tr-sm bg-blue-500 text-white"
-                              : "rounded-2xl rounded-tl-sm bg-white dark:bg-white/6 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-white/8"
-                          }`}
-                        >
-                          {!chatMessage.isOwnMessage && (
-                            <p className="text-[11px] font-medium mb-1 text-slate-500 dark:text-slate-400">
-                              {chatMessage.senderName}
-                            </p>
-                          )}
+          ) : messages.length > 0 ? (
+            <div>
+              {groups.map((group) => (
+                <div key={group.dayKey}>
+                  <DateSeparator label={group.dayLabel} />
+                  <div className="space-y-1">
+                    {group.messages.map((chatMessage) => (
+                      <div
+                        key={chatMessage.uuid}
+                        className={`flex flex-col ${chatMessage.isOwnMessage ? "items-end" : "items-start"}`}
+                      >
+                        {chatMessage.attachments.some(
+                          (attachment) => attachment.attachmentType === "IMAGE",
+                        ) && (
                           <AttachmentDisplay
                             attachments={chatMessage.attachments.filter(
                               (attachment) =>
-                                attachment.attachmentType !== "IMAGE" &&
-                                attachment.mimeType !== "application/pdf",
+                                attachment.attachmentType === "IMAGE",
                             )}
                             isOwn={chatMessage.isOwnMessage}
+                            imageClassName={`mb-1.5 ${chatMessage.isOwnMessage ? "justify-end" : "justify-start"}`}
+                            onPreviewImage={openPreviewImage}
                           />
-                          {chatMessage.content && (
-                            <p
-                              className={`text-sm leading-relaxed ${
-                                chatMessage.attachments.some(
-                                  (attachment) =>
-                                    attachment.attachmentType !== "IMAGE" &&
-                                    attachment.mimeType !== "application/pdf",
-                                )
-                                  ? "mt-1.5"
-                                  : ""
-                              }`}
-                            >
-                              {chatMessage.content}
-                            </p>
-                          )}
-                        </div>
-                      )}
+                        )}
 
-                      {!chatMessage.content &&
-                        chatMessage.attachments.length > 0 &&
-                        chatMessage.attachments.every(
-                          (attachment) => attachment.attachmentType === "IMAGE",
+                        {chatMessage.attachments.some(
+                          (attachment) =>
+                            attachment.mimeType === "application/pdf",
                         ) && (
+                          <AttachmentDisplay
+                            attachments={chatMessage.attachments.filter(
+                              (attachment) =>
+                                attachment.mimeType === "application/pdf",
+                            )}
+                            isOwn={chatMessage.isOwnMessage}
+                            docClassName="mb-1.5"
+                          />
+                        )}
+
+                        {(chatMessage.content ||
+                          chatMessage.attachments.some(
+                            (attachment) =>
+                              attachment.attachmentType !== "IMAGE" &&
+                              attachment.mimeType !== "application/pdf",
+                          )) && (
                           <div
-                            className={`max-w-[75%] px-3 py-1.5 ${
+                            className={`max-w-[75%] px-4 py-2.5 ${
                               chatMessage.isOwnMessage
-                                ? "rounded-2xl rounded-tr-sm bg-blue-500/12 text-blue-700 dark:text-blue-200"
-                                : "rounded-2xl rounded-tl-sm bg-slate-100 text-slate-500 dark:bg-white/6 dark:text-slate-400 border border-slate-200 dark:border-white/8"
+                                ? "rounded-2xl rounded-tr-sm bg-blue-500 text-white"
+                                : "rounded-2xl rounded-tl-sm bg-white dark:bg-white/6 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-white/8"
                             }`}
                           >
                             {!chatMessage.isOwnMessage && (
-                              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                              <p className="text-[11px] font-medium mb-1 text-slate-500 dark:text-slate-400">
                                 {chatMessage.senderName}
                               </p>
                             )}
-                            <p className="text-[11px]">
-                              {chatMessage.attachments.length === 1 ? "Image" : `${chatMessage.attachments.length} images`}
-                            </p>
+                            <AttachmentDisplay
+                              attachments={chatMessage.attachments.filter(
+                                (attachment) =>
+                                  attachment.attachmentType !== "IMAGE" &&
+                                  attachment.mimeType !== "application/pdf",
+                              )}
+                              isOwn={chatMessage.isOwnMessage}
+                            />
+                            {chatMessage.content && (
+                              <p
+                                className={`text-sm leading-relaxed ${
+                                  chatMessage.attachments.some(
+                                    (attachment) =>
+                                      attachment.attachmentType !== "IMAGE" &&
+                                      attachment.mimeType !== "application/pdf",
+                                  )
+                                    ? "mt-1.5"
+                                    : ""
+                                }`}
+                              >
+                                {chatMessage.content}
+                              </p>
+                            )}
                           </div>
                         )}
 
-                      {/* Timestamp + Seen */}
-                      <div className="flex items-center gap-1 mt-1.5 px-1">
-                        <span className="text-[10px] tabular-nums text-slate-400 dark:text-slate-500">
-                          {formatMessageTime(chatMessage.createdAt)}
-                        </span>
-                        {chatMessage.uuid === lastReadOwnMessageUuid && (
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                            · Seen
+                        {!chatMessage.content &&
+                          chatMessage.attachments.length > 0 &&
+                          chatMessage.attachments.every(
+                            (attachment) =>
+                              attachment.attachmentType === "IMAGE",
+                          ) && (
+                            <div
+                              className={`max-w-[75%] px-3 py-1.5 ${
+                                chatMessage.isOwnMessage
+                                  ? "rounded-2xl rounded-tr-sm bg-blue-500/12 text-blue-700 dark:text-blue-200"
+                                  : "rounded-2xl rounded-tl-sm bg-slate-100 text-slate-500 dark:bg-white/6 dark:text-slate-400 border border-slate-200 dark:border-white/8"
+                              }`}
+                            >
+                              {!chatMessage.isOwnMessage && (
+                                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                  {chatMessage.senderName}
+                                </p>
+                              )}
+                              <p className="text-[11px]">
+                                {chatMessage.attachments.length === 1
+                                  ? "Image"
+                                  : `${chatMessage.attachments.length} images`}
+                              </p>
+                            </div>
+                          )}
+
+                        {/* Timestamp + Seen */}
+                        <div className="flex items-center gap-1 mt-1.5 px-1">
+                          <span className="text-[10px] tabular-nums text-slate-400 dark:text-slate-500">
+                            {formatMessageTime(chatMessage.createdAt)}
                           </span>
-                        )}
+                          {chatMessage.uuid === lastReadOwnMessageUuid && (
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                              · Seen
+                            </span>
+                          )}
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {showTypingBubble && (
+                <div className="flex justify-start mt-2">
+                  <div className="max-w-[75%]">
+                    <div className="mb-1 px-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      {typingActorLabel}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            {showTypingBubble && (
-              <div className="flex justify-start mt-2">
-                <div className="max-w-[75%]">
-                  <div className="mb-1 px-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    {selected.name}
-                  </div>
-                  <div className="relative overflow-hidden rounded-[22px] rounded-bl-md border border-slate-200/90 bg-white px-4 py-3 shadow-[0_12px_30px_-18px_rgba(15,23,42,0.45)] dark:border-white/8 dark:bg-white/6 dark:shadow-none">
-                    <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-blue-300/70 to-transparent dark:via-blue-400/30" />
-                    <TypingDots dotClassName="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-500" />
+                    <div className="relative overflow-hidden rounded-[22px] rounded-bl-md border border-slate-200/90 bg-white px-4 py-3 shadow-[0_12px_30px_-18px_rgba(15,23,42,0.45)] dark:border-white/8 dark:bg-white/6 dark:shadow-none">
+                      <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-blue-300/70 to-transparent dark:via-blue-400/30" />
+                      <TypingDots dotClassName="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-500" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div ref={bottomRef} />
-          </div>
-        ) : (
-          <div className="h-full flex items-center justify-center">
-            {showTypingBubble ? (
-              <div className="w-full max-w-sm">
-                <div className="mb-3 flex items-center justify-center gap-3">
+              <div ref={bottomRef} />
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              {showTypingBubble ? (
+                <div className="w-full max-w-sm">
+                  <div className="mb-3 flex items-center justify-center gap-3">
+                    <div
+                      className={`h-11 w-11 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-sm font-semibold text-white shadow-lg shadow-slate-200/60 dark:shadow-none`}
+                    >
+                      {selected.initials}
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        {typingActorLabel}
+                      </p>
+                      <p className="text-[12px] text-blue-500 dark:text-blue-400">
+                        {typingLabel}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mx-auto w-fit rounded-[24px] rounded-bl-md border border-slate-200 bg-white px-5 py-4 dark:border-white/8 dark:bg-white/6 dark:shadow-none shadow-none">
+                    <TypingDots
+                      dotClassName="h-2.5 w-2.5 rounded-full bg-blue-400"
+                      gapClassName="gap-2"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center space-y-2">
                   <div
-                    className={`h-11 w-11 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-sm font-semibold text-white shadow-lg shadow-slate-200/60 dark:shadow-none`}
+                    className={`w-12 h-12 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-sm font-semibold text-white mx-auto`}
                   >
                     {selected.initials}
                   </div>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                      {selected.name}
-                    </p>
-                    <p className="text-[12px] text-blue-500 dark:text-blue-400">
-                      Composing a message
-                    </p>
-                  </div>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {selected.name}
+                  </p>
+                  <p className="text-[12px] text-slate-400 dark:text-slate-600">
+                    No messages yet. Say hello!
+                  </p>
                 </div>
-                <div className="mx-auto w-fit rounded-[24px] rounded-bl-md border border-slate-200 bg-white px-5 py-4 dark:border-white/8 dark:bg-white/6 dark:shadow-none shadow-none">
-                  <TypingDots
-                    dotClassName="h-2.5 w-2.5 rounded-full bg-blue-400"
-                    gapClassName="gap-2"
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Input */}
+        <div className="px-5 py-4 border-t border-slate-200 dark:border-white/6 bg-white dark:bg-[#070d1e] shrink-0">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={FILE_INPUT_ACCEPT}
+            className="hidden"
+            onChange={handleFileInputChange}
+          />
+
+          <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/8 rounded-2xl focus-within:border-blue-400/40 dark:focus-within:border-blue-500/25 transition-colors overflow-hidden">
+            {/* Selected files preview */}
+            {selectedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-4 pt-3 pb-1">
+                {selectedFiles.map((file, i) => (
+                  <SelectedFileChip
+                    key={`${file.name}-${file.size}-${i}`}
+                    file={file}
+                    onRemove={() => onRemoveFile(i)}
                   />
-                </div>
-              </div>
-            ) : (
-              <div className="text-center space-y-2">
-                <div
-                  className={`w-12 h-12 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-sm font-semibold text-white mx-auto`}
-                >
-                  {selected.initials}
-                </div>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {selected.name}
-                </p>
-                <p className="text-[12px] text-slate-400 dark:text-slate-600">
-                  No messages yet. Say hello!
-                </p>
+                ))}
+                {selectedFiles.length < MAX_FILES && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-16 h-16 rounded-lg border-2 border-dashed border-slate-300 dark:border-white/15 flex items-center justify-center text-slate-400 dark:text-slate-600 hover:border-blue-400 hover:text-blue-400 transition-colors shrink-0"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             )}
-          </div>
-        )}
-      </div>
 
-      {/* Input */}
-      <div className="px-5 py-4 border-t border-slate-200 dark:border-white/6 bg-white dark:bg-[#070d1e] shrink-0">
-        {/* Hidden file input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept={FILE_INPUT_ACCEPT}
-          className="hidden"
-          onChange={handleFileInputChange}
-        />
+            {(selectedFiles.length > 0 || fileError) && (
+              <div className="px-4 pt-2">
+                {selectedFiles.length > 0 && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Up to 5 files per message. JPG, JPEG, PNG, PDF, DOC, DOCX,
+                    XLS, XLSX, CSV, ZIP, PPT and PPTX only. Max 10 MB each.
+                  </p>
+                )}
+                {fileError && (
+                  <p className="mt-1 text-[11px] text-rose-500">{fileError}</p>
+                )}
+              </div>
+            )}
 
-        <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/8 rounded-2xl focus-within:border-blue-400/40 dark:focus-within:border-blue-500/25 transition-colors overflow-hidden">
-          {/* Selected files preview */}
-          {selectedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-4 pt-3 pb-1">
-              {selectedFiles.map((file, i) => (
-                <SelectedFileChip
-                  key={`${file.name}-${file.size}-${i}`}
-                  file={file}
-                  onRemove={() => onRemoveFile(i)}
-                />
-              ))}
-              {selectedFiles.length < MAX_FILES && (
+            {isGroup && activeMention && filteredMentionMembers.length > 0 && (
+              <div className="px-3 pt-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.55)] dark:border-white/8 dark:bg-[#0f172a] dark:shadow-none">
+                  <div className="px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                    Mention Group Member
+                  </div>
+                  <div className="max-h-52 overflow-y-auto">
+                    {filteredMentionMembers.map((participant, index) => (
+                      <button
+                        key={participant.id}
+                        type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          insertMention(participant);
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                          activeMentionIndex === index
+                            ? "bg-slate-100 dark:bg-white/8"
+                            : "hover:bg-slate-50 dark:hover:bg-white/5"
+                        }`}
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-cyan-500 text-[11px] font-semibold text-white">
+                          {participant.initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-medium text-slate-800 dark:text-slate-100">
+                            {participant.name}
+                          </p>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                            @{participant.name.replace(/\s+/g, "")}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <textarea
+              ref={textareaRef}
+              placeholder="Send a message... use @ to mention someone"
+              value={message}
+              onChange={(e) => handleComposerChange(e.target.value)}
+              onClick={(e) =>
+                syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)
+              }
+              onKeyUp={(e) => {
+                if (
+                  e.key === "ArrowDown" ||
+                  e.key === "ArrowUp" ||
+                  e.key === "Enter" ||
+                  e.key === "Tab" ||
+                  e.key === "Escape"
+                ) {
+                  return;
+                }
+
+                syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart);
+              }}
+              onKeyDown={(e) => {
+                if (isGroup && activeMention && filteredMentionMembers.length > 0) {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setHighlightedMentionIndex((current) =>
+                      Math.min(current + 1, filteredMentionMembers.length - 1),
+                    );
+                    return;
+                  }
+
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setHighlightedMentionIndex((current) =>
+                      Math.max(current - 1, 0),
+                    );
+                    return;
+                  }
+
+                  if (e.key === "Enter" || e.key === "Tab") {
+                    e.preventDefault();
+                    insertMention(
+                      filteredMentionMembers[activeMentionIndex] ??
+                        filteredMentionMembers[0],
+                    );
+                    return;
+                  }
+
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setActiveMention(null);
+                    return;
+                  }
+                }
+
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onSendMessage();
+                }
+              }}
+              rows={3}
+              className="w-full bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none resize-none px-4 pt-3.5 pb-1"
+            />
+
+            <div className="flex items-center justify-between px-3 pb-3 pt-1">
+              <div className="flex items-center gap-0.5">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-16 h-16 rounded-lg border-2 border-dashed border-slate-300 dark:border-white/15 flex items-center justify-center text-slate-400 dark:text-slate-600 hover:border-blue-400 hover:text-blue-400 transition-colors shrink-0"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/8 transition-colors"
+                  title="Attach files"
                 >
                   <Paperclip className="w-4 h-4" />
                 </button>
-              )}
-            </div>
-          )}
 
-          {(selectedFiles.length > 0 || fileError) && (
-            <div className="px-4 pt-2">
-              {selectedFiles.length > 0 && (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Up to 5 files per message. JPG, JPEG, PNG, PDF, DOC, DOCX, XLS, XLSX, CSV, ZIP, PPT and PPTX only. Max 10 MB each.
-                </p>
-              )}
-              {fileError && (
-                <p className="mt-1 text-[11px] text-rose-500">
-                  {fileError}
-                </p>
-              )}
-            </div>
-          )}
+                <EmojiPickerButton
+                  onSelect={(emoji) => onMessageChange(message + emoji)}
+                />
+              </div>
 
-          <textarea
-            placeholder="Send a message... use @ to mention someone"
-            value={message}
-            onChange={(e) => onMessageChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                onSendMessage()
-              }
-            }}
-            rows={3}
-            className="w-full bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none resize-none px-4 pt-3.5 pb-1"
-          />
-
-          <div className="flex items-center justify-between px-3 pb-3 pt-1">
-            <div className="flex items-center gap-0.5">
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/8 transition-colors"
-                title="Attach files"
+                onClick={onSendMessage}
+                disabled={!canSend}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/15 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 dark:text-slate-200 text-[13px] font-medium transition-all"
               >
-                <Paperclip className="w-4 h-4" />
+                <Send className="w-3.5 h-3.5" />
+                Send
               </button>
-
-              <Popover.Root open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
-                <Popover.Trigger asChild>
-                  <button
-                    type="button"
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/8 transition-colors"
-                    title="Emoji"
-                  >
-                    <Smile className="w-4 h-4" />
-                  </button>
-                </Popover.Trigger>
-                <Popover.Portal>
-                  <Popover.Content
-                    side="top"
-                    align="start"
-                    sideOffset={8}
-                    className="z-50 outline-none"
-                  >
-                    <EmojiPicker.Root
-                      columns={8}
-                      onEmojiSelect={({ emoji }) => {
-                        onMessageChange(message + emoji)
-                        setEmojiPickerOpen(false)
-                      }}
-                      className="w-[348px] rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-2xl flex flex-col overflow-hidden"
-                    >
-                      {/* Search */}
-                      <div className="relative px-3 pt-3 pb-2">
-                        <svg
-                          className="absolute left-6 top-1/2 translate-y-[-2px] w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <circle cx="11" cy="11" r="8" />
-                          <path d="m21 21-4.35-4.35" />
-                        </svg>
-                        <EmojiPicker.Search
-                          className="w-full h-10 rounded-xl bg-slate-100 dark:bg-white/8 pl-9 pr-3 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none border border-slate-200/80 dark:border-white/8 focus:border-blue-400/60 dark:focus:border-blue-500/40 transition-colors"
-                          placeholder="Search…"
-                        />
-                      </div>
-
-                      {/* List */}
-                      <EmojiPicker.Viewport className="h-[300px] overflow-y-auto px-2">
-                        <EmojiPicker.Loading className="flex h-full items-center justify-center text-[12px] text-slate-400 dark:text-slate-600">
-                          Loading…
-                        </EmojiPicker.Loading>
-                        <EmojiPicker.Empty className="flex h-full items-center justify-center text-[12px] text-slate-400 dark:text-slate-600">
-                          No emoji found.
-                        </EmojiPicker.Empty>
-                        <EmojiPicker.List components={emojiListComponents} />
-                      </EmojiPicker.Viewport>
-
-                      {/* Footer: active emoji name + skin tone */}
-                      <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-t border-slate-100 dark:border-white/6">
-                        <EmojiPicker.ActiveEmoji>
-                          {({ emoji }) =>
-                            emoji ? (
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-xl leading-none shrink-0">{emoji.emoji}</span>
-                                <span className="text-[13px] font-medium text-slate-600 dark:text-slate-300 truncate capitalize">
-                                  {emoji.label}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-[12px] text-slate-400 dark:text-slate-600">
-                                Pick an emoji…
-                              </span>
-                            )
-                          }
-                        </EmojiPicker.ActiveEmoji>
-                        <EmojiPicker.SkinToneSelector
-                          emoji="👋"
-                          className="shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-[20px] hover:bg-slate-100 dark:hover:bg-white/8 transition-colors cursor-pointer"
-                        />
-                      </div>
-                    </EmojiPicker.Root>
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover.Root>
             </div>
-
-            <button
-              type="button"
-              onClick={onSendMessage}
-              disabled={!canSend}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/15 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 dark:text-slate-200 text-[13px] font-medium transition-all"
-            >
-              <Send className="w-3.5 h-3.5" />
-              Send
-            </button>
           </div>
         </div>
-      </div>
       </main>
 
       {previewImage && (
@@ -1343,5 +1048,5 @@ export function ChatWindow({
         />
       )}
     </>
-  )
+  );
 }
