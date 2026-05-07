@@ -3,7 +3,6 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { Check, ChevronLeft, ChevronRight, MessageSquarePlus, Search, Users } from "lucide-react"
 import { UserMenu } from "@/components/chat/user-menu"
-import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import type { ChatConversation } from "@/components/chat/chat-window"
 import type { ChatListFilter } from "@/hooks/use-direct-chats"
 
@@ -99,23 +98,6 @@ export function ChatSidebar({
               )}
             </AnimatePresence>
           </div>
-          <AnimatePresence initial={false}>
-            {!isSidebarCollapsed && (
-              <motion.div
-                key="theme-toggle"
-                initial={{ opacity: 0, scale: 0.86, x: 8 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                exit={{ opacity: 0, scale: 0.86, x: 8 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-              >
-                <AnimatedThemeToggler
-                  variant="circle"
-                  duration={500}
-                  className="w-8 h-8 shrink-0 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/6 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-colors ml-2 [&_svg]:w-4 [&_svg]:h-4"
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         {/* Search */}
@@ -264,85 +246,105 @@ export function ChatSidebar({
               </button>
             </div>
           ) : (
-            conversations.map(conv => (
-              <button
-                key={conv.id}
-                onClick={() => onSelectConversation(conv.id)}
-                className={`w-full transition-all text-left ${
-                  isSidebarCollapsed
-                    ? `flex justify-center rounded-2xl py-2 ${
-                        selectedId === conv.id
-                          ? "bg-slate-100 dark:bg-white/9"
-                          : "hover:bg-slate-50 dark:hover:bg-white/4"
-                      }`
-                    : `flex items-center gap-3 px-3 py-2.5 rounded-xl ${
-                        selectedId === conv.id
-                          ? "bg-slate-100 dark:bg-white/9"
-                          : "hover:bg-slate-50 dark:hover:bg-white/4"
-                      }`
-                }`}
-                title={isSidebarCollapsed ? conv.name : undefined}
-              >
-                {/* Avatar */}
-                <div className="relative shrink-0">
-                  <div className={`w-10 h-10 rounded-full bg-linear-to-br ${conv.gradient} flex items-center justify-center text-[11px] font-semibold text-white`}>
-                    {conv.initials}
+            <>
+              {!isSidebarCollapsed && activeFilter === "GROUPS" && (
+                <button
+                  type="button"
+                  onClick={onCreateGroup}
+                  className="mb-2 flex w-full items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-blue-50/70 px-4 py-4 text-center transition-colors hover:bg-blue-100/80 dark:border-blue-400/25 dark:bg-blue-500/8 dark:hover:bg-blue-500/12"
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    
+                    <div className="flex gap-2 items-center">
+                      <Users className="h-4 w-4" /> 
+                      <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-100">
+                      Create Group Chat
+                      </p>
+                    </div>
                   </div>
-                  {conv.online && (
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white dark:border-[#0b1425]" />
-                  )}
-                </div>
+                </button>
+              )}
 
-                {/* Expanded content */}
-                <AnimatePresence initial={false}>
-                  {!isSidebarCollapsed && (
-                    <motion.div
-                      key={`conv-content-${conv.id}`}
-                      initial={{ opacity: 0, x: -10, filter: "blur(3px)" }}
-                      animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                      exit={{ opacity: 0, x: -8, filter: "blur(3px)" }}
-                      transition={contentTransition}
-                      className="flex-1 min-w-0 flex items-center gap-2"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`text-[13px] font-medium truncate ${
-                            selectedId === conv.id
-                              ? "text-slate-900 dark:text-white"
-                              : "text-slate-600 dark:text-slate-300"
+              {conversations.map(conv => (
+                <button
+                  key={conv.id}
+                  onClick={() => onSelectConversation(conv.id)}
+                  className={`w-full transition-all text-left ${
+                    isSidebarCollapsed
+                      ? `flex justify-center rounded-2xl py-2 ${
+                          selectedId === conv.id
+                            ? "bg-slate-100 dark:bg-white/9"
+                            : "hover:bg-slate-50 dark:hover:bg-white/4"
+                        }`
+                      : `flex items-center gap-3 px-3 py-2.5 rounded-xl ${
+                          selectedId === conv.id
+                            ? "bg-slate-100 dark:bg-white/9"
+                            : "hover:bg-slate-50 dark:hover:bg-white/4"
+                        }`
+                  }`}
+                  title={isSidebarCollapsed ? conv.name : undefined}
+                >
+                  {/* Avatar */}
+                  <div className="relative shrink-0">
+                    <div className={`w-10 h-10 rounded-full bg-linear-to-br ${conv.gradient} flex items-center justify-center text-[11px] font-semibold text-white`}>
+                      {conv.initials}
+                    </div>
+                    {conv.online && (
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white dark:border-[#0b1425]" />
+                    )}
+                  </div>
+
+                  {/* Expanded content */}
+                  <AnimatePresence initial={false}>
+                    {!isSidebarCollapsed && (
+                      <motion.div
+                        key={`conv-content-${conv.id}`}
+                        initial={{ opacity: 0, x: -10, filter: "blur(3px)" }}
+                        animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                        exit={{ opacity: 0, x: -8, filter: "blur(3px)" }}
+                        transition={contentTransition}
+                        className="flex-1 min-w-0 flex items-center gap-2"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-[13px] font-medium truncate ${
+                              selectedId === conv.id
+                                ? "text-slate-900 dark:text-white"
+                                : "text-slate-600 dark:text-slate-300"
+                            }`}>
+                              {conv.name}
+                            </span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-700 shrink-0">{conv.time}</span>
+                          </div>
+                          <p className={`text-[11px] truncate mt-0.5 ${
+                            conv.isTyping
+                              ? "text-blue-500 dark:text-blue-400 font-medium"
+                              : "text-slate-400 dark:text-slate-600"
                           }`}>
-                            {conv.name}
-                          </span>
-                          <span className="text-[10px] text-slate-400 dark:text-slate-700 shrink-0">{conv.time}</span>
+                            {conv.isTyping ? "typing..." : conv.lastMessage}
+                          </p>
                         </div>
-                        <p className={`text-[11px] truncate mt-0.5 ${
-                          conv.isTyping
-                            ? "text-blue-500 dark:text-blue-400 font-medium"
-                            : "text-slate-400 dark:text-slate-600"
-                        }`}>
-                          {conv.isTyping ? "typing..." : conv.lastMessage}
-                        </p>
-                      </div>
 
-                      <AnimatePresence initial={false}>
-                        {conv.unread > 0 && (
-                          <motion.span
-                            key={`badge-${conv.id}`}
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.5 }}
-                            transition={{ duration: 0.15, ease: "easeOut" }}
-                            className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-500 text-[10px] font-semibold text-white flex items-center justify-center"
-                          >
-                            {conv.unread}
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </button>
-            ))
+                        <AnimatePresence initial={false}>
+                          {conv.unread > 0 && (
+                            <motion.span
+                              key={`badge-${conv.id}`}
+                              initial={{ opacity: 0, scale: 0.5 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.5 }}
+                              transition={{ duration: 0.15, ease: "easeOut" }}
+                              className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-500 text-[10px] font-semibold text-white flex items-center justify-center"
+                            >
+                              {conv.unread}
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </button>
+              ))}
+            </>
           )}
         </div>
 

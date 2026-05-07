@@ -28,10 +28,16 @@ export function useSendGroupMessage(conversationUuid?: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({
+      content,
+      mentions,
+    }: {
+      content: string
+      mentions?: Array<{ mentionedUserId: number; offset: number; length: number }>
+    }) => {
       const { data } = await api.post<SendGroupMessageResponse>(
         `/chats/group/${conversationUuid}/messages`,
-        { content },
+        { content, mentions },
       )
       return data
     },
@@ -46,9 +52,20 @@ export function useUploadGroupMessage(conversationUuid?: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ content, files }: { content: string; files: File[] }) => {
+    mutationFn: async ({
+      content,
+      files,
+      mentions,
+    }: {
+      content: string
+      files: File[]
+      mentions?: Array<{ mentionedUserId: number; offset: number; length: number }>
+    }) => {
       const formData = new FormData()
       if (content.trim()) formData.append("content", content.trim())
+      if (mentions && mentions.length > 0) {
+        formData.append("mentions", JSON.stringify(mentions))
+      }
       for (const file of files) formData.append("files", file)
 
       const { data } = await api.post<SendGroupMessageResponse>(

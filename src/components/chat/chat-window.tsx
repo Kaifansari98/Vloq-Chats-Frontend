@@ -2,15 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  MoreHorizontal,
-  Paperclip,
-  Phone,
-  Send,
-  Video,
-  X,
-} from "lucide-react";
+import { FileText, ImageIcon, Paperclip, Send, X } from "lucide-react";
 import { AttachmentDisplay } from "@/components/chat/attachment-display";
+import { NotificationBell } from "@/components/chat/notification-bell";
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { EmojiPickerButton } from "./emoji-picker-button";
 import { ImagePreviewModal } from "@/components/chat/image-preview-modal";
 import type { MessageAttachment } from "@/hooks/use-direct-messages";
@@ -40,6 +35,7 @@ export type ChatMessage = {
   senderName: string;
   isOwnMessage: boolean;
   createdAt: string;
+  readAt?: string | null;
   status: "sent" | "read";
   attachments: MessageAttachment[];
 };
@@ -111,23 +107,73 @@ const GROUP_AVATAR_GRADIENTS = [
   "from-blue-500 to-cyan-500",
 ];
 
+function MemberPopoverContent({
+  participants,
+}: {
+  participants: ParticipantPreview[];
+}) {
+  return (
+    <div className="w-[220px] rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.4)] dark:border-white/10 dark:bg-[#0f172a] dark:shadow-[0_18px_36px_-24px_rgba(0,0,0,0.72)]">
+      <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+        Members
+      </div>
+      <div className="grid grid-cols-3 gap-x-2 gap-y-3">
+        {participants.map((item, itemIndex) => {
+          const itemGradient =
+            GROUP_AVATAR_GRADIENTS[itemIndex % GROUP_AVATAR_GRADIENTS.length];
+          const [firstName = "", secondName = ""] = item.name.split(" ");
+
+          return (
+            <div key={item.id} className="flex flex-col items-center text-center">
+              <div
+                title={item.name}
+                className={`flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br ${itemGradient} text-[10px] font-semibold text-white`}
+              >
+                {item.initials}
+              </div>
+              <div className="mt-1 min-h-[24px] text-[10px] leading-tight text-slate-600 dark:text-slate-300">
+                <div>{firstName}</div>
+                <div>{secondName}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function GroupParticipantsCluster({
   participants,
 }: {
   participants: ParticipantPreview[];
 }) {
   const [hoveredParticipantId, setHoveredParticipantId] = useState<number | null>(null);
-  const visibleParticipants = participants.slice(0, 6);
+  const [openPopoverId, setOpenPopoverId] = useState<number | "more" | null>(null);
+  const clusterRef = useRef<HTMLDivElement>(null);
+  const visibleParticipants = participants.slice(0, 3);
   const extraCount = participants.length - visibleParticipants.length;
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!clusterRef.current) return;
+      if (clusterRef.current.contains(event.target as Node)) return;
+      setOpenPopoverId(null);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
 
   if (participants.length === 0) {
     return null;
   }
 
   return (
-    <div className="flex items-center pl-3">
+    <div ref={clusterRef} className="flex items-center pl-3">
       {visibleParticipants.map((participant, index) => {
         const isHovered = hoveredParticipantId === participant.id;
+        const isPopoverOpen = openPopoverId === participant.id;
         const gradient =
           GROUP_AVATAR_GRADIENTS[index % GROUP_AVATAR_GRADIENTS.length];
 
@@ -146,13 +192,19 @@ function GroupParticipantsCluster({
               )
             }
           >
-            <motion.div
+            <motion.button
+              type="button"
+              onClick={() =>
+                setOpenPopoverId((current) =>
+                  current === participant.id ? null : participant.id,
+                )
+              }
               whileHover={{ y: -2, scale: 1.04 }}
               transition={{ duration: 0.16, ease: "easeOut" }}
               className={`flex h-8 w-8 items-center justify-center rounded-full border border-white/50 bg-linear-to-br ${gradient} text-[11px] font-semibold text-white shadow-[0_12px_24px_-16px_rgba(15,23,42,0.38)] dark:border-white/10 dark:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.85)]`}
             >
               {participant.initials}
-            </motion.div>
+            </motion.button>
 
             <AnimatePresence>
               {isHovered && (
@@ -169,6 +221,20 @@ function GroupParticipantsCluster({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            <AnimatePresence>
+              {isPopoverOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="absolute top-full right-0 z-30 mt-3"
+              >
+                <MemberPopoverContent participants={participants} />
+              </motion.div>
+            )}
+          </AnimatePresence>
           </div>
         );
       })}
@@ -182,13 +248,17 @@ function GroupParticipantsCluster({
             setHoveredParticipantId((current) => (current === -1 ? null : current))
           }
         >
-          <motion.div
+          <motion.button
+            type="button"
+            onClick={() =>
+              setOpenPopoverId((current) => (current === "more" ? null : "more"))
+            }
             whileHover={{ y: -2, scale: 1.04 }}
             transition={{ duration: 0.16, ease: "easeOut" }}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-200 text-[11px] font-semibold text-slate-700 dark:border-white/10 dark:bg-[#202b4a] dark:text-slate-200"
           >
             +{extraCount}
-          </motion.div>
+          </motion.button>
 
           <AnimatePresence>
             {hoveredParticipantId === -1 && (
@@ -202,6 +272,20 @@ function GroupParticipantsCluster({
                 <div className="rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-medium whitespace-nowrap text-white shadow-lg dark:bg-white dark:text-slate-900">
                   {extraCount} more active
                 </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {openPopoverId === "more" && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="absolute top-full right-0 z-30 mt-3"
+              >
+                <MemberPopoverContent participants={participants} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -255,6 +339,17 @@ function formatMessageTime(dateString: string) {
   }).format(new Date(dateString));
 }
 
+function formatFullDateTime(dateString: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(dateString));
+}
+
 function isImageFileType(mimeType: string) {
   return mimeType.startsWith("image/");
 }
@@ -263,6 +358,61 @@ function getFileExtension(fileName: string) {
   const parts = fileName.split(".");
   if (parts.length < 2) return "FILE";
   return parts.at(-1)?.toUpperCase() ?? "FILE";
+}
+
+function truncateMiddle(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value;
+  const segmentLength = Math.max(1, Math.floor((maxLength - 3) / 2));
+  return `${value.slice(0, segmentLength)}...${value.slice(-segmentLength)}`;
+}
+
+function formatIncomingFiles(
+  incoming: File[],
+  selectedFiles: File[],
+): {
+  files: File[];
+  error: string | null;
+} {
+  if (incoming.length === 0) {
+    return {
+      files: selectedFiles,
+      error: null,
+    };
+  }
+
+  const valid: File[] = [];
+  const errors: string[] = [];
+
+  for (const file of incoming) {
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      errors.push(`"${file.name}" is not a supported file type`);
+      continue;
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      errors.push(`"${file.name}" is larger than 10 MB`);
+      continue;
+    }
+    valid.push(file);
+  }
+
+  const existingKeys = new Set(
+    selectedFiles.map((file) => `${file.name}-${file.size}-${file.type}`),
+  );
+  const deduped = valid.filter((file) => {
+    const key = `${file.name}-${file.size}-${file.type}`;
+    if (existingKeys.has(key)) return false;
+    existingKeys.add(key);
+    return true;
+  });
+
+  if (selectedFiles.length + deduped.length > MAX_FILES) {
+    errors.push("You can attach up to 5 files in one message");
+  }
+
+  return {
+    files: [...selectedFiles, ...deduped].slice(0, MAX_FILES),
+    error: errors[0] ?? null,
+  };
 }
 
 function groupMessagesByDay(messages: ChatMessage[]): MessageGroup[] {
@@ -283,6 +433,103 @@ function groupMessagesByDay(messages: ChatMessage[]): MessageGroup[] {
   }
 
   return groups;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const URL_REGEX = /((?:https?:\/\/|www\.)[^\s<]+)/gi;
+
+function normalizeUrl(url: string) {
+  return url.startsWith("http://") || url.startsWith("https://")
+    ? url
+    : `https://${url}`;
+}
+
+function renderTextWithLinks(text: string, keyPrefix: string, isOwn: boolean) {
+  const parts = text.split(URL_REGEX);
+
+  return parts.map((part, index) => {
+    if (!part) return null;
+
+    if (!URL_REGEX.test(part)) {
+      return <span key={`${keyPrefix}-text-${index}`}>{part}</span>;
+    }
+
+    URL_REGEX.lastIndex = 0;
+
+    return (
+      <a
+        key={`${keyPrefix}-link-${index}`}
+        href={normalizeUrl(part)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`inline rounded px-0.5 py-px break-all transition-opacity hover:opacity-80 ${
+          isOwn
+            ? "bg-white/20 text-white underline underline-offset-2"
+            : "bg-blue-50 text-blue-600 underline underline-offset-2 dark:bg-blue-500/15 dark:text-blue-300"
+        }`}
+      >
+        {part}
+      </a>
+    );
+  });
+}
+
+function renderMessageWithMentions({
+  content,
+  participants,
+  isOwn,
+}: {
+  content: string;
+  participants: ParticipantPreview[];
+  isOwn: boolean;
+}) {
+  if (participants.length === 0) {
+    return renderTextWithLinks(content, "message", isOwn);
+  }
+
+  const names = [...new Set(participants.map((participant) => participant.name))]
+    .sort((a, b) => b.length - a.length);
+
+  if (names.length === 0) {
+    return renderTextWithLinks(content, "message", isOwn);
+  }
+
+  const mentionRegex = new RegExp(
+    `(@(?:${names.map((name) => escapeRegExp(name)).join("|")}))`,
+    "g",
+  );
+  const parts = content.split(mentionRegex);
+
+  return parts.map((part, index) => {
+    if (!part) return null;
+
+    if (!mentionRegex.test(part)) {
+      mentionRegex.lastIndex = 0;
+      return (
+        <span key={`${part}-${index}`}>
+          {renderTextWithLinks(part, `message-${index}`, isOwn)}
+        </span>
+      );
+    }
+
+    mentionRegex.lastIndex = 0;
+
+    return (
+      <span
+        key={`${part}-${index}`}
+        className={`rounded-full px-1.5 py-0.5 font-semibold ${
+          isOwn
+            ? "bg-white/16 text-white"
+            : "bg-blue-100 text-blue-700 dark:bg-blue-500/18 dark:text-blue-300"
+        }`}
+      >
+        {part}
+      </span>
+    );
+  });
 }
 
 function findActiveMention(value: string, caretIndex: number): ActiveMention | null {
@@ -399,6 +646,73 @@ function SelectedFileChip({
   );
 }
 
+function DragDropOverlay({
+  files,
+}: {
+  files: File[];
+}) {
+  const previewFile = files[0] ?? null;
+  const isImage = previewFile ? ALLOWED_IMAGE_TYPES.includes(previewFile.type) : false;
+  const title = files.length > 1 ? "Drop files here" : "Drop file here";
+
+  return (
+    <div className="pointer-events-none absolute inset-3 z-40 overflow-hidden rounded-[28px] bg-[#0c0d0f]/90 shadow-[0_28px_80px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+      <svg
+        className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)]"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <rect
+          x="1"
+          y="1"
+          width="98"
+          height="98"
+          rx="3"
+          ry="3"
+          fill="none"
+          stroke="rgba(96,165,250,0.9)"
+          strokeWidth="0.35"
+          strokeDasharray="1 1.25"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_28%),radial-gradient(circle_at_80%_28%,rgba(16,185,129,0.14),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))]" />
+      <div className="absolute inset-0 flex items-center justify-center px-8">
+        <div className="flex items-center gap-6 text-white">
+          <div className="flex flex-col items-center">
+            <div className="flex h-24 w-24 items-center justify-center rounded-[22px] border border-white/10 bg-white/92 shadow-[0_20px_45px_rgba(0,0,0,0.25)]">
+              {isImage ? (
+                <ImageIcon className="h-11 w-11 text-slate-700" strokeWidth={1.8} />
+              ) : (
+                <FileText className="h-11 w-11 text-slate-700" strokeWidth={1.8} />
+              )}
+            </div>
+            {previewFile ? (
+              <div className="mt-3 max-w-[180px] rounded-md bg-blue-600 px-2.5 py-1 text-center text-[12px] font-medium leading-tight text-white shadow-[0_12px_20px_rgba(37,99,235,0.35)]">
+                {truncateMiddle(previewFile.name, 28)}
+              </div>
+            ) : null}
+            {files.length > 1 ? (
+              <p className="mt-2 text-[11px] font-medium text-white/65">
+                {files.length} files selected
+              </p>
+            ) : null}
+          </div>
+          <div className="pt-3">
+            <p className="text-[20px] font-semibold tracking-[-0.02em] text-white">
+              {title}
+            </p>
+            <p className="mt-2 text-sm text-white/55">
+              Images and documents will be attached to this message.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── main component ───────────────────────────────────────────────────────────
 
 export function ChatWindow({
@@ -418,6 +732,7 @@ export function ChatWindow({
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentionListRef = useRef<HTMLDivElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<MessageAttachment | null>(
     null,
@@ -425,7 +740,10 @@ export function ChatWindow({
   const [previewZoom, setPreviewZoom] = useState(1);
   const [activeMention, setActiveMention] = useState<ActiveMention | null>(null);
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
+  const [draggedFiles, setDraggedFiles] = useState<File[]>([]);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const pendingSelectionRef = useRef<number | null>(null);
+  const dragDepthRef = useRef(0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -480,45 +798,68 @@ export function ChatWindow({
   function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const incoming = Array.from(e.target.files ?? []);
     e.target.value = ""; // reset so same file can be re-selected
-    setFileError(null);
+    const nextSelection = formatIncomingFiles(incoming, selectedFiles);
+    onFileSelect(nextSelection.files);
+    setFileError(nextSelection.error);
+  }
 
-    if (incoming.length === 0) return;
+  function resetDragState() {
+    dragDepthRef.current = 0;
+    setIsDraggingFiles(false);
+    setDraggedFiles([]);
+  }
 
-    const valid: File[] = [];
-    const errors: string[] = [];
+  function handleDragEnter(event: React.DragEvent<HTMLElement>) {
+    const hasFiles = Array.from(event.dataTransfer.types).includes("Files");
+    if (!hasFiles) return;
 
-    for (const file of incoming) {
-      if (!ALLOWED_TYPES.includes(file.type)) {
-        errors.push(`"${file.name}" is not a supported file type`);
-        continue;
-      }
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        errors.push(`"${file.name}" is larger than 10 MB`);
-        continue;
-      }
-      valid.push(file);
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDraggingFiles(true);
+
+    const previewFiles = Array.from(event.dataTransfer.items)
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+
+    if (previewFiles.length > 0) {
+      setDraggedFiles(previewFiles);
     }
+  }
 
-    const existingKeys = new Set(
-      selectedFiles.map((file) => `${file.name}-${file.size}-${file.type}`),
-    );
-    const deduped = valid.filter((file) => {
-      const key = `${file.name}-${file.size}-${file.type}`;
-      if (existingKeys.has(key)) return false;
-      existingKeys.add(key);
-      return true;
-    });
+  function handleDragOver(event: React.DragEvent<HTMLElement>) {
+    const hasFiles = Array.from(event.dataTransfer.types).includes("Files");
+    if (!hasFiles) return;
 
-    if (selectedFiles.length + deduped.length > MAX_FILES) {
-      errors.push("You can attach up to 5 files in one message");
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    if (!isDraggingFiles) {
+      setIsDraggingFiles(true);
     }
+  }
 
-    const combined = [...selectedFiles, ...deduped].slice(0, MAX_FILES);
-    onFileSelect(combined);
+  function handleDragLeave(event: React.DragEvent<HTMLElement>) {
+    const hasFiles = Array.from(event.dataTransfer.types).includes("Files");
+    if (!hasFiles) return;
 
-    if (errors.length > 0) {
-      setFileError(errors[0]);
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+
+    if (dragDepthRef.current === 0) {
+      resetDragState();
     }
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLElement>) {
+    const hasFiles = Array.from(event.dataTransfer.types).includes("Files");
+    if (!hasFiles) return;
+
+    event.preventDefault();
+    const incoming = Array.from(event.dataTransfer.files ?? []);
+    const nextSelection = formatIncomingFiles(incoming, selectedFiles);
+    onFileSelect(nextSelection.files);
+    setFileError(nextSelection.error);
+    resetDragState();
   }
 
   const groupMembers = selected.participants ?? [];
@@ -549,6 +890,18 @@ export function ChatWindow({
     textareaRef.current.setSelectionRange(selection, selection);
   }, [message]);
 
+  useEffect(() => {
+    if (!activeMention || !mentionListRef.current) return;
+
+    const activeItem = mentionListRef.current.querySelector<HTMLElement>(
+      `[data-mention-index="${activeMentionIndex}"]`,
+    );
+
+    activeItem?.scrollIntoView({
+      block: "nearest",
+    });
+  }, [activeMention, activeMentionIndex]);
+
   function syncMentionState(nextValue: string, caretIndex: number | null) {
     if (!isGroup || caretIndex === null) {
       setActiveMention(null);
@@ -560,9 +913,8 @@ export function ChatWindow({
     setHighlightedMentionIndex(0);
   }
 
-  function handleComposerChange(value: string) {
+  function handleComposerChange(value: string, caretIndex: number | null) {
     onMessageChange(value);
-    const caretIndex = textareaRef.current?.selectionStart ?? value.length;
     syncMentionState(value, caretIndex);
   }
 
@@ -575,8 +927,9 @@ export function ChatWindow({
     const nextCaretIndex = activeMention.start + participant.name.length + 2;
 
     pendingSelectionRef.current = nextCaretIndex;
+    setHighlightedMentionIndex(0);
     onMessageChange(nextValue);
-    setActiveMention(null);
+    syncMentionState(nextValue, nextCaretIndex);
   }
 
   const canSend =
@@ -610,7 +963,15 @@ export function ChatWindow({
 
   return (
     <>
-      <main className="flex-1 flex flex-col min-w-0">
+      <main
+        className="relative flex-1 min-w-0"
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDraggingFiles && <DragDropOverlay files={draggedFiles} />}
+        <div className="flex h-full flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 h-[68px] border-b border-slate-200 dark:border-white/6 bg-white dark:bg-[#070d1e] shrink-0">
           <div className="flex items-center gap-3">
@@ -649,16 +1010,24 @@ export function ChatWindow({
           </div>
           <div className="flex items-center gap-1.5">
             {isGroup ? (
-              <GroupParticipantsCluster participants={selected.participants ?? []} />
+              <>
+                <GroupParticipantsCluster participants={selected.participants ?? []} />
+                <NotificationBell />
+                <AnimatedThemeToggler
+                  variant="circle"
+                  duration={500}
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-[0_14px_30px_-24px_rgba(15,23,42,0.65)] transition-colors hover:bg-slate-50 dark:border-white/8 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 [&_svg]:h-4.5 [&_svg]:w-4.5"
+                />
+              </>
             ) : (
-              [Phone, Video, MoreHorizontal].map((Icon, i) => (
-                <button
-                  key={i}
-                  className="w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
-                >
-                  <Icon className="w-4 h-4 text-slate-400 dark:text-slate-600" />
-                </button>
-              ))
+              <>
+                <NotificationBell />
+                <AnimatedThemeToggler
+                  variant="circle"
+                  duration={500}
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-[0_14px_30px_-24px_rgba(15,23,42,0.65)] transition-colors hover:bg-slate-50 dark:border-white/8 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 [&_svg]:h-4.5 [&_svg]:w-4.5"
+                />
+              </>
             )}
           </div>
         </div>
@@ -746,7 +1115,11 @@ export function ChatWindow({
                                     : ""
                                 }`}
                               >
-                                {chatMessage.content}
+                                {renderMessageWithMentions({
+                                  content: chatMessage.content,
+                                  participants: selected.participants ?? [],
+                                  isOwn: chatMessage.isOwnMessage,
+                                })}
                               </p>
                             )}
                           </div>
@@ -779,7 +1152,7 @@ export function ChatWindow({
                           )}
 
                         {/* Timestamp + Seen */}
-                        <div className="flex items-center gap-1 mt-1.5 px-1">
+                        <div className="group/ts relative flex items-center gap-1 mt-1.5 px-1 cursor-default">
                           <span className="text-[10px] tabular-nums text-slate-400 dark:text-slate-500">
                             {formatMessageTime(chatMessage.createdAt)}
                           </span>
@@ -788,6 +1161,23 @@ export function ChatWindow({
                               · Seen
                             </span>
                           )}
+                          {/* Tooltip */}
+                          <div className={`pointer-events-none absolute bottom-full mb-2 z-50 opacity-0 group-hover/ts:opacity-100 transition-opacity duration-150 ${chatMessage.isOwnMessage ? "right-0" : "left-0"}`}>
+                            <div className="rounded-xl bg-slate-900 dark:bg-slate-800 px-3 py-2 shadow-lg whitespace-nowrap">
+                              <p className="text-[11px] text-slate-300">
+                                <span className="text-slate-500 mr-1">Sent at</span>
+                                {formatFullDateTime(chatMessage.createdAt)}
+                              </p>
+                              {chatMessage.uuid === lastReadOwnMessageUuid && (
+                                <p className="text-[11px] text-slate-300 mt-0.5">
+                                  <span className="text-slate-500 mr-1">Seen at</span>
+                                  {chatMessage.readAt
+                                    ? formatFullDateTime(chatMessage.readAt)
+                                    : "—"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -857,7 +1247,50 @@ export function ChatWindow({
         </div>
 
         {/* Input */}
-        <div className="px-5 py-4 border-t border-slate-200 dark:border-white/6 bg-white dark:bg-[#070d1e] shrink-0">
+        <div className="relative px-5 py-4 border-t border-slate-200 dark:border-white/6 bg-white dark:bg-[#070d1e] shrink-0">
+          {isGroup && activeMention && filteredMentionMembers.length > 0 && (
+            <div className="absolute bottom-[calc(100%-8px)] left-5 z-30">
+                <div className="w-[270px] overflow-hidden rounded-2xl border border-slate-200/90 bg-white/98 p-1.5 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.45)] backdrop-blur-sm dark:border-white/10 dark:bg-[#0f172a]/98 dark:shadow-[0_18px_36px_-24px_rgba(0,0,0,0.72)]">
+                  <div className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                    Mention
+                  </div>
+                <div
+                  ref={mentionListRef}
+                  className="max-h-56 overflow-y-auto"
+                >
+                  {filteredMentionMembers.map((participant, index) => (
+                    <button
+                      key={participant.id}
+                      data-mention-index={index}
+                      type="button"
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        insertMention(participant);
+                      }}
+                      className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                        activeMentionIndex === index
+                          ? "bg-slate-100 dark:bg-white/8"
+                          : "hover:bg-slate-50 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-cyan-500 text-[10px] font-semibold text-white">
+                        {participant.initials}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[12px] font-medium text-slate-800 dark:text-slate-100">
+                          {participant.name}
+                        </p>
+                        <p className="truncate text-[10px] text-slate-400 dark:text-slate-500">
+                          @{participant.name.replace(/\s+/g, "")}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Hidden file input */}
           <input
             ref={fileInputRef}
@@ -905,51 +1338,20 @@ export function ChatWindow({
               </div>
             )}
 
-            {isGroup && activeMention && filteredMentionMembers.length > 0 && (
-              <div className="px-3 pt-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_16px_34px_-24px_rgba(15,23,42,0.55)] dark:border-white/8 dark:bg-[#0f172a] dark:shadow-none">
-                  <div className="px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
-                    Mention Group Member
-                  </div>
-                  <div className="max-h-52 overflow-y-auto">
-                    {filteredMentionMembers.map((participant, index) => (
-                      <button
-                        key={participant.id}
-                        type="button"
-                        onMouseDown={(event) => {
-                          event.preventDefault();
-                          insertMention(participant);
-                        }}
-                        className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors ${
-                          activeMentionIndex === index
-                            ? "bg-slate-100 dark:bg-white/8"
-                            : "hover:bg-slate-50 dark:hover:bg-white/5"
-                        }`}
-                      >
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-cyan-500 text-[11px] font-semibold text-white">
-                          {participant.initials}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-[13px] font-medium text-slate-800 dark:text-slate-100">
-                            {participant.name}
-                          </p>
-                          <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                            @{participant.name.replace(/\s+/g, "")}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
             <textarea
               ref={textareaRef}
               placeholder="Send a message... use @ to mention someone"
               value={message}
-              onChange={(e) => handleComposerChange(e.target.value)}
+              onChange={(e) =>
+                handleComposerChange(
+                  e.currentTarget.value,
+                  e.currentTarget.selectionStart,
+                )
+              }
               onClick={(e) =>
+                syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)
+              }
+              onSelect={(e) =>
                 syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart)
               }
               onKeyUp={(e) => {
@@ -1035,6 +1437,7 @@ export function ChatWindow({
               </button>
             </div>
           </div>
+        </div>
         </div>
       </main>
 

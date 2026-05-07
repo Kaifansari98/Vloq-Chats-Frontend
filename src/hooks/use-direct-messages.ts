@@ -22,6 +22,7 @@ export type DirectMessage = {
   updatedAt: string
   isOwnMessage: boolean
   status: "sent" | "read"
+  readAt?: string | null
   attachments: MessageAttachment[]
 }
 

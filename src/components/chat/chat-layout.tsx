@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import {
   useOrganizationMembers,
@@ -34,6 +36,7 @@ import {
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { CreateGroupModal } from "@/components/chat/create-group-modal";
 import { createChatSocket, type ChatSocket } from "@/lib/socket";
+import type { NotificationItem } from "@/hooks/use-notifications";
 
 const GRADIENTS = [
   "from-violet-500 to-purple-600",
@@ -45,6 +48,43 @@ const GRADIENTS = [
   "from-fuchsia-500 to-pink-600",
   "from-orange-500 to-red-600",
 ];
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildMessageMentions(
+  content: string,
+  participants: Array<{ id: number; name: string }>,
+) {
+  const mentions: Array<{ mentionedUserId: number; offset: number; length: number }> = [];
+
+  for (const participant of [...participants].sort(
+    (left, right) => right.name.length - left.name.length,
+  )) {
+    const regex = new RegExp(`@${escapeRegExp(participant.name)}(?=\\s|$)`, "g");
+
+    let match: RegExpExecArray | null = regex.exec(content);
+    while (match) {
+      mentions.push({
+        mentionedUserId: participant.id,
+        offset: match.index,
+        length: match[0].length,
+      });
+      match = regex.exec(content);
+    }
+  }
+
+  return mentions
+    .filter((mention, index, all) =>
+      all.findIndex(
+        (candidate) =>
+          candidate.mentionedUserId === mention.mentionedUserId &&
+          candidate.offset === mention.offset,
+      ) === index,
+    )
+    .sort((left, right) => left.offset - right.offset);
+}
 
 function formatRelativeTime(dateString?: string) {
   if (!dateString) return "";
@@ -202,6 +242,7 @@ function groupChatToConversation(
 
 export function ChatLayout() {
   const { user, token } = useAuth();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     typeof window === "undefined"
@@ -226,6 +267,14 @@ export function ChatLayout() {
     { type: "direct"; participantUserId: number } | { type: "group"; conversationUuid: string } | null
   >(null);
   const isTypingRef = useRef(false);
+
+  useEffect(() => {
+    const chatFromUrl = searchParams.get("chat");
+    if (!chatFromUrl) return;
+
+    setSelectedId(chatFromUrl);
+    localStorage.setItem("vloq:selectedChatId", chatFromUrl);
+  }, [searchParams]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -305,6 +354,26 @@ export function ChatLayout() {
         queryKey: ["group-messages", incomingMessage.conversationUuid],
       });
       void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
+    });
+
+    socket.on("notification:new", (notification: NotificationItem) => {
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      toast.info(notification.title, {
+        description: notification.body,
+        duration: 5000,
+        action: notification.conversationUuid
+          ? {
+              label: "Open",
+              onClick: () => {
+                localStorage.setItem(
+                  "vloq:selectedChatId",
+                  notification.conversationUuid!,
+                );
+                setSelectedId(notification.conversationUuid);
+              },
+            }
+          : undefined,
+      });
     });
 
     socket.on("presence:snapshot", (payload: { onlineUserIds?: number[] }) => {
@@ -391,6 +460,13 @@ export function ChatLayout() {
         });
       },
     );
+
+    socket.on("ip_restricted", () => {
+      const past = "expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+      document.cookie = `vloq_access_token=; ${past}`;
+      document.cookie = `vloq_auth_user=; ${past}`;
+      window.location.href = "/login";
+    });
 
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -597,6 +673,11 @@ export function ChatLayout() {
     void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
   }, [selected, isLoadingMessages, queryClient]);
 
+  useEffect(() => {
+    if (!selected || isLoadingMessages || !messagesData?.data) return;
+    void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  }, [selected?.id, isLoadingMessages, messagesData?.data, queryClient]);
+
   async function sendMessage() {
     const content = message.trim();
     if ((!content && selectedFiles.length === 0) || !selected) return;
@@ -604,10 +685,18 @@ export function ChatLayout() {
     stopTyping();
 
     if (isGroup) {
+      const mentions = buildMessageMentions(
+        content,
+        "participants" in selected ? (selected.participants ?? []) : [],
+      );
       if (selectedFiles.length > 0) {
-        await uploadGroupMessage.mutateAsync({ content, files: selectedFiles });
+        await uploadGroupMessage.mutateAsync({
+          content,
+          files: selectedFiles,
+          mentions,
+        });
       } else if (content) {
-        await sendGroupMessage.mutateAsync(content);
+        await sendGroupMessage.mutateAsync({ content, mentions });
       }
     } else {
       if (!selected.memberId) return;
@@ -651,6 +740,7 @@ export function ChatLayout() {
             isOwnMessage: item.isOwnMessage,
             createdAt: item.createdAt,
             status: item.status,
+            readAt: item.readAt,
             attachments: item.attachments,
           }))}
           isLoadingMessages={isLoadingMessages}
