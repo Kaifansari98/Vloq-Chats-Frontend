@@ -73,7 +73,7 @@ const ALLOWED_DOC_TYPES = [
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ];
 const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_DOC_TYPES];
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const MAX_FILES = 5;
 const FILE_INPUT_ACCEPT =
   ".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.ppt,.pptx,image/jpeg,image/png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/zip,application/x-zip-compressed,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -391,7 +391,7 @@ function formatIncomingFiles(
       continue;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      errors.push(`"${file.name}" is larger than 10 MB`);
+      errors.push(`"${file.name}" is larger than 50 MB`);
       continue;
     }
     valid.push(file);
@@ -1411,7 +1411,7 @@ export function ChatWindow({
                 {selectedFiles.length > 0 && (
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     Up to 5 files per message. JPG, JPEG, PNG, PDF, DOC, DOCX,
-                    XLS, XLSX, CSV, ZIP, PPT and PPTX only. Max 10 MB each.
+                    XLS, XLSX, CSV, ZIP, PPT and PPTX only. Max 50 MB each.
                   </p>
                 )}
                 {fileError && (
