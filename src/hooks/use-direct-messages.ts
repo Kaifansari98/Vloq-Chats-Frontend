@@ -70,7 +70,15 @@ export function useUploadDirectMessage(participantUserId?: number) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ content, files }: { content: string; files: File[] }) => {
+    mutationFn: async ({
+      content,
+      files,
+      onUploadProgress,
+    }: {
+      content: string
+      files: File[]
+      onUploadProgress?: (pct: number) => void
+    }) => {
       const formData = new FormData()
       formData.append("participantUserId", String(participantUserId))
       if (content.trim()) formData.append("content", content.trim())
@@ -79,7 +87,14 @@ export function useUploadDirectMessage(participantUserId?: number) {
       const { data } = await api.post<SendDirectMessageResponse>(
         "/chats/direct/messages/upload",
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          onUploadProgress: (event) => {
+            if (event.lengthComputable && event.total) {
+              onUploadProgress?.(Math.round((event.loaded / event.total) * 100))
+            }
+          },
+        },
       )
       return data
     },

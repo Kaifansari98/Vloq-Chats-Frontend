@@ -32,6 +32,7 @@ import { EmptyChat } from "@/components/chat/empty-chat";
 import {
   ChatWindow,
   type ChatConversation,
+  type ChatMessage,
 } from "@/components/chat/chat-window";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { CreateGroupModal } from "@/components/chat/create-group-modal";
@@ -251,6 +252,7 @@ export function ChatLayout() {
   );
   const [message, setMessage] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<ChatListFilter>("ALL");
@@ -684,31 +686,76 @@ export function ChatLayout() {
 
     stopTyping();
 
-    if (isGroup) {
-      const mentions = buildMessageMentions(
-        content,
-        "participants" in selected ? (selected.participants ?? []) : [],
-      );
-      if (selectedFiles.length > 0) {
-        await uploadGroupMessage.mutateAsync({
-          content,
-          files: selectedFiles,
-          mentions,
-        });
-      } else if (content) {
-        await sendGroupMessage.mutateAsync({ content, mentions });
-      }
-    } else {
-      if (!selected.memberId) return;
-      if (selectedFiles.length > 0) {
-        await uploadDirectMessage.mutateAsync({ content, files: selectedFiles });
-      } else {
-        await sendDirectMessage.mutateAsync(content);
-      }
-    }
-
+    const filesToUpload = [...selectedFiles];
     setMessage("");
     setSelectedFiles([]);
+
+    if (filesToUpload.length === 0) {
+      if (isGroup) {
+        const mentions = buildMessageMentions(
+          content,
+          "participants" in selected ? (selected.participants ?? []) : [],
+        );
+        await sendGroupMessage.mutateAsync({ content, mentions });
+      } else {
+        if (!selected.memberId) return;
+        await sendDirectMessage.mutateAsync(content);
+      }
+      return;
+    }
+
+    // File upload — show optimistic message immediately
+    const pendingId = `pending-${Date.now()}`;
+    const objectUrls: string[] = [];
+
+    const pendingAttachments = filesToUpload.map((file) => {
+      const url = URL.createObjectURL(file);
+      objectUrls.push(url);
+      return {
+        uuid: `pending-${file.name}-${file.size}`,
+        attachmentType: file.type.startsWith("image/") ? "IMAGE" : "DOCUMENT",
+        name: file.name,
+        url,
+        mimeType: file.type,
+        sizeBytes: file.size,
+      };
+    });
+
+    const pendingMsg: ChatMessage = {
+      uuid: pendingId,
+      content: content || null,
+      senderName: user?.name ?? "",
+      isOwnMessage: true,
+      createdAt: new Date().toISOString(),
+      status: "sent",
+      attachments: pendingAttachments,
+      isPending: true,
+      uploadProgress: 0,
+    };
+
+    setPendingMessages((prev) => [...prev, pendingMsg]);
+
+    const updateProgress = (pct: number) => {
+      setPendingMessages((prev) =>
+        prev.map((m) => m.uuid === pendingId ? { ...m, uploadProgress: pct } : m),
+      );
+    };
+
+    try {
+      if (isGroup) {
+        const mentions = buildMessageMentions(
+          content,
+          "participants" in selected ? (selected.participants ?? []) : [],
+        );
+        await uploadGroupMessage.mutateAsync({ content, files: filesToUpload, mentions, onUploadProgress: updateProgress });
+      } else {
+        if (!selected.memberId) return;
+        await uploadDirectMessage.mutateAsync({ content, files: filesToUpload, onUploadProgress: updateProgress });
+      }
+    } finally {
+      for (const url of objectUrls) URL.revokeObjectURL(url);
+      setPendingMessages((prev) => prev.filter((m) => m.uuid !== pendingId));
+    }
   }
 
   return (
@@ -733,16 +780,19 @@ export function ChatLayout() {
         <ChatWindow
           selected={selected}
           message={message}
-          messages={(messagesData?.data ?? []).map((item) => ({
-            uuid: item.uuid,
-            content: item.content,
-            senderName: item.senderName,
-            isOwnMessage: item.isOwnMessage,
-            createdAt: item.createdAt,
-            status: item.status,
-            readAt: item.readAt,
-            attachments: item.attachments,
-          }))}
+          messages={[
+            ...(messagesData?.data ?? []).map((item) => ({
+              uuid: item.uuid,
+              content: item.content,
+              senderName: item.senderName,
+              isOwnMessage: item.isOwnMessage,
+              createdAt: item.createdAt,
+              status: item.status,
+              readAt: item.readAt,
+              attachments: item.attachments,
+            })),
+            ...pendingMessages,
+          ]}
           isLoadingMessages={isLoadingMessages}
           selectedFiles={selectedFiles}
           isSendingMessage={

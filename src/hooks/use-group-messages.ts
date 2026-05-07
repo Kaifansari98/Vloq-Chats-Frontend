@@ -56,10 +56,12 @@ export function useUploadGroupMessage(conversationUuid?: string) {
       content,
       files,
       mentions,
+      onUploadProgress,
     }: {
       content: string
       files: File[]
       mentions?: Array<{ mentionedUserId: number; offset: number; length: number }>
+      onUploadProgress?: (pct: number) => void
     }) => {
       const formData = new FormData()
       if (content.trim()) formData.append("content", content.trim())
@@ -71,7 +73,14 @@ export function useUploadGroupMessage(conversationUuid?: string) {
       const { data } = await api.post<SendGroupMessageResponse>(
         `/chats/group/${conversationUuid}/messages/upload`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          onUploadProgress: (event) => {
+            if (event.lengthComputable && event.total) {
+              onUploadProgress?.(Math.round((event.loaded / event.total) * 100))
+            }
+          },
+        },
       )
       return data
     },

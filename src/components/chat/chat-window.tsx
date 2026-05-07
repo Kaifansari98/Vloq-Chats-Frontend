@@ -38,6 +38,8 @@ export type ChatMessage = {
   readAt?: string | null;
   status: "sent" | "read";
   attachments: MessageAttachment[];
+  isPending?: boolean;
+  uploadProgress?: number;
 };
 
 type ChatWindowProps = {
@@ -550,6 +552,73 @@ function findActiveMention(value: string, caretIndex: number): ActiveMention | n
   };
 }
 
+// ─── upload progress ─────────────────────────────────────────────────────────
+
+const RING_R = 21;
+const RING_CIRC = 2 * Math.PI * RING_R;
+
+function CircularUploadProgress({
+  progress,
+  size = "md",
+}: {
+  progress: number;
+  size?: "sm" | "md";
+}) {
+  const dim = size === "sm" ? 44 : 56;
+  const c = dim / 2;
+  const r = size === "sm" ? 16 : RING_R;
+  const circ = size === "sm" ? 2 * Math.PI * 16 : RING_CIRC;
+  const sw = size === "sm" ? 2.5 : 2.8;
+  const isIdle = progress <= 0;
+  const offset = circ - (progress / 100) * circ;
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: dim, height: dim }}>
+      <svg width={dim} height={dim} viewBox={`0 0 ${dim} ${dim}`} className="absolute" aria-hidden>
+        {/* Track */}
+        <circle cx={c} cy={c} r={r} fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth={sw} />
+        {isIdle ? (
+          /* Indeterminate spinning arc */
+          <motion.g
+            animate={{ rotate: 360 }}
+            transition={{ duration: 0.85, repeat: Infinity, ease: "linear" }}
+            style={{ originX: `${c}px`, originY: `${c}px` }}
+          >
+            <circle
+              cx={c} cy={c} r={r}
+              fill="none"
+              stroke="white"
+              strokeWidth={sw}
+              strokeLinecap="round"
+              strokeDasharray={`${circ * 0.22} ${circ * 0.78}`}
+              transform={`rotate(-90 ${c} ${c})`}
+            />
+          </motion.g>
+        ) : (
+          /* Determinate fill */
+          <motion.circle
+            cx={c} cy={c} r={r}
+            fill="none"
+            stroke="white"
+            strokeWidth={sw}
+            strokeLinecap="round"
+            strokeDasharray={circ}
+            initial={{ strokeDashoffset: circ }}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ ease: "linear", duration: 0.15 }}
+            transform={`rotate(-90 ${c} ${c})`}
+          />
+        )}
+      </svg>
+      {!isIdle && (
+        <span className="relative text-[10px] font-bold text-white tabular-nums leading-none drop-shadow-sm">
+          {progress}%
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ─── sub-components ───────────────────────────────────────────────────────────
 
 function DateSeparator({ label }: { label: string }) {
@@ -1052,29 +1121,42 @@ export function ChatWindow({
                         {chatMessage.attachments.some(
                           (attachment) => attachment.attachmentType === "IMAGE",
                         ) && (
-                          <AttachmentDisplay
-                            attachments={chatMessage.attachments.filter(
-                              (attachment) =>
-                                attachment.attachmentType === "IMAGE",
+                          <div className="relative mb-1.5">
+                            <AttachmentDisplay
+                              attachments={chatMessage.attachments.filter(
+                                (attachment) =>
+                                  attachment.attachmentType === "IMAGE",
+                              )}
+                              isOwn={chatMessage.isOwnMessage}
+                              imageClassName={chatMessage.isOwnMessage ? "justify-end" : "justify-start"}
+                              onPreviewImage={chatMessage.isPending ? undefined : openPreviewImage}
+                            />
+                            {chatMessage.isPending && (
+                              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-black/48">
+                                <CircularUploadProgress progress={chatMessage.uploadProgress ?? 0} />
+                              </div>
                             )}
-                            isOwn={chatMessage.isOwnMessage}
-                            imageClassName={`mb-1.5 ${chatMessage.isOwnMessage ? "justify-end" : "justify-start"}`}
-                            onPreviewImage={openPreviewImage}
-                          />
+                          </div>
                         )}
 
                         {chatMessage.attachments.some(
                           (attachment) =>
                             attachment.mimeType === "application/pdf",
                         ) && (
-                          <AttachmentDisplay
-                            attachments={chatMessage.attachments.filter(
-                              (attachment) =>
-                                attachment.mimeType === "application/pdf",
+                          <div className="relative mb-1.5">
+                            <AttachmentDisplay
+                              attachments={chatMessage.attachments.filter(
+                                (attachment) =>
+                                  attachment.mimeType === "application/pdf",
+                              )}
+                              isOwn={chatMessage.isOwnMessage}
+                            />
+                            {chatMessage.isPending && (
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-black/35">
+                                <CircularUploadProgress progress={chatMessage.uploadProgress ?? 0} size="sm" />
+                              </div>
                             )}
-                            isOwn={chatMessage.isOwnMessage}
-                            docClassName="mb-1.5"
-                          />
+                          </div>
                         )}
 
                         {(chatMessage.content ||
@@ -1154,7 +1236,7 @@ export function ChatWindow({
                         {/* Timestamp + Seen */}
                         <div className="group/ts relative flex items-center gap-1 mt-1.5 px-1 cursor-default">
                           <span className="text-[10px] tabular-nums text-slate-400 dark:text-slate-500">
-                            {formatMessageTime(chatMessage.createdAt)}
+                            {chatMessage.isPending ? "Uploading…" : formatMessageTime(chatMessage.createdAt)}
                           </span>
                           {chatMessage.uuid === lastReadOwnMessageUuid && (
                             <span className="text-[10px] text-slate-400 dark:text-slate-500">
@@ -1162,7 +1244,7 @@ export function ChatWindow({
                             </span>
                           )}
                           {/* Tooltip */}
-                          <div className={`pointer-events-none absolute bottom-full mb-2 z-50 opacity-0 group-hover/ts:opacity-100 transition-opacity duration-150 ${chatMessage.isOwnMessage ? "right-0" : "left-0"}`}>
+                          <div className={`pointer-events-none absolute bottom-full mb-2 z-50 opacity-0 transition-opacity duration-150 ${chatMessage.isPending ? "" : "group-hover/ts:opacity-100"} ${chatMessage.isOwnMessage ? "right-0" : "left-0"}`}>
                             <div className="rounded-xl bg-slate-900 dark:bg-slate-800 px-3 py-2 shadow-lg whitespace-nowrap">
                               <p className="text-[11px] text-slate-300">
                                 <span className="text-slate-500 mr-1">Sent at</span>
