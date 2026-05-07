@@ -71,12 +71,14 @@ const ALLOWED_DOC_TYPES = [
   "application/x-zip-compressed",
   "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "audio/mpeg",
+  "audio/wav",
 ];
 const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_DOC_TYPES];
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const MAX_FILES = 5;
 const FILE_INPUT_ACCEPT =
-  ".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.ppt,.pptx,image/jpeg,image/png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/zip,application/x-zip-compressed,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  ".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.ppt,.pptx,.mp3,.wav,image/jpeg,image/png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/zip,application/x-zip-compressed,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,audio/mpeg,audio/wav";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -1159,11 +1161,26 @@ export function ChatWindow({
                           </div>
                         )}
 
+                        {chatMessage.attachments.some(
+                          (a) => a.mimeType === "audio/mpeg" || a.mimeType === "audio/wav",
+                        ) && (
+                          <div className="mb-1.5">
+                            <AttachmentDisplay
+                              attachments={chatMessage.attachments.filter(
+                                (a) => a.mimeType === "audio/mpeg" || a.mimeType === "audio/wav",
+                              )}
+                              isOwn={chatMessage.isOwnMessage}
+                            />
+                          </div>
+                        )}
+
                         {(chatMessage.content ||
                           chatMessage.attachments.some(
                             (attachment) =>
                               attachment.attachmentType !== "IMAGE" &&
-                              attachment.mimeType !== "application/pdf",
+                              attachment.mimeType !== "application/pdf" &&
+                              attachment.mimeType !== "audio/mpeg" &&
+                              attachment.mimeType !== "audio/wav",
                           )) && (
                           <div
                             className={`max-w-[75%] px-4 py-2.5 ${
@@ -1181,7 +1198,9 @@ export function ChatWindow({
                               attachments={chatMessage.attachments.filter(
                                 (attachment) =>
                                   attachment.attachmentType !== "IMAGE" &&
-                                  attachment.mimeType !== "application/pdf",
+                                  attachment.mimeType !== "application/pdf" &&
+                                  attachment.mimeType !== "audio/mpeg" &&
+                                  attachment.mimeType !== "audio/wav",
                               )}
                               isOwn={chatMessage.isOwnMessage}
                             />
@@ -1411,7 +1430,7 @@ export function ChatWindow({
                 {selectedFiles.length > 0 && (
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     Up to 5 files per message. JPG, JPEG, PNG, PDF, DOC, DOCX,
-                    XLS, XLSX, CSV, ZIP, PPT and PPTX only. Max 50 MB each.
+                    XLS, XLSX, CSV, ZIP, PPT, PPTX, MP3 and WAV only. Max 50 MB each.
                   </p>
                 )}
                 {fileError && (
