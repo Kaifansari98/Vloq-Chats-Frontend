@@ -23,6 +23,7 @@ type ChatSidebarProps = {
   isSidebarCollapsed: boolean
   search: string
   activeFilter: ChatListFilter
+  isAdmin: boolean
   user: {
     organizationName?: string | null
     organizationEmail?: string | null
@@ -48,6 +49,7 @@ export function ChatSidebar({
   isSidebarCollapsed,
   search,
   activeFilter,
+  isAdmin,
   user,
   onSelectConversation,
   onToggleCollapse,
@@ -236,29 +238,30 @@ export function ChatSidebar({
               <p className="mt-3 text-[13px] text-slate-500 dark:text-slate-400">
                 Create a group to chat with multiple people.
               </p>
-              <button
-                type="button"
-                onClick={onCreateGroup}
-                className="mt-7 inline-flex items-center gap-2 rounded-full bg-blue-500 px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(59,130,246,0.8)] transition-all hover:bg-blue-400 active:scale-95"
-              >
-                <MessageSquarePlus className="w-4 h-4" />
-                Create Group
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={onCreateGroup}
+                  className="mt-7 inline-flex items-center gap-2 rounded-full bg-blue-500 px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(59,130,246,0.8)] transition-all hover:bg-blue-400 active:scale-95"
+                >
+                  <MessageSquarePlus className="w-4 h-4" />
+                  Create Group
+                </button>
+              )}
             </div>
           ) : (
             <>
-              {!isSidebarCollapsed && activeFilter === "GROUPS" && (
+              {!isSidebarCollapsed && activeFilter === "GROUPS" && isAdmin && (
                 <button
                   type="button"
                   onClick={onCreateGroup}
                   className="mb-2 flex w-full items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-blue-50/70 px-4 py-4 text-center transition-colors hover:bg-blue-100/80 dark:border-blue-400/25 dark:bg-blue-500/8 dark:hover:bg-blue-500/12"
                 >
                   <div className="flex flex-col items-center gap-2">
-                    
                     <div className="flex gap-2 items-center">
-                      <Users className="h-4 w-4" /> 
+                      <Users className="h-4 w-4" />
                       <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-100">
-                      Create Group Chat
+                        Create Group Chat
                       </p>
                     </div>
                   </div>

@@ -680,6 +680,52 @@ export function ChatLayout() {
     void queryClient.invalidateQueries({ queryKey: ["notifications"] });
   }, [selected?.id, isLoadingMessages, messagesData?.data, queryClient]);
 
+  async function sendVoiceMessage(file: File) {
+    if (!selected) return;
+
+    const pendingId = `pending-voice-${Date.now()}`;
+    const objectUrl = URL.createObjectURL(file);
+
+    const pendingMsg: ChatMessage = {
+      uuid: pendingId,
+      content: null,
+      senderName: user?.name ?? "",
+      isOwnMessage: true,
+      createdAt: new Date().toISOString(),
+      status: "sent",
+      attachments: [{
+        uuid: `pending-${file.name}-${file.size}`,
+        attachmentType: "DOCUMENT",
+        name: file.name,
+        url: objectUrl,
+        mimeType: file.type,
+        sizeBytes: file.size,
+      }],
+      isPending: true,
+      uploadProgress: 0,
+    };
+
+    setPendingMessages((prev) => [...prev, pendingMsg]);
+
+    const updateProgress = (pct: number) => {
+      setPendingMessages((prev) =>
+        prev.map((m) => m.uuid === pendingId ? { ...m, uploadProgress: pct } : m),
+      );
+    };
+
+    try {
+      if (isGroup) {
+        await uploadGroupMessage.mutateAsync({ content: "", files: [file], mentions: [], onUploadProgress: updateProgress });
+      } else {
+        if (!selected.memberId) return;
+        await uploadDirectMessage.mutateAsync({ content: "", files: [file], onUploadProgress: updateProgress });
+      }
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+      setPendingMessages((prev) => prev.filter((m) => m.uuid !== pendingId));
+    }
+  }
+
   async function sendMessage() {
     const content = message.trim();
     if ((!content && selectedFiles.length === 0) || !selected) return;
@@ -768,6 +814,7 @@ export function ChatLayout() {
         isSidebarCollapsed={isSidebarCollapsed}
         search={search}
         activeFilter={activeFilter}
+        isAdmin={user?.userTypeCode === "ADMIN"}
         user={user}
         onSelectConversation={selectConversation}
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
@@ -809,6 +856,7 @@ export function ChatLayout() {
             : []}
           onMessageChange={handleMessageChange}
           onSendMessage={sendMessage}
+          onSendVoiceMessage={sendVoiceMessage}
           onFileSelect={setSelectedFiles}
           onRemoveFile={(index) =>
             setSelectedFiles((prev) => prev.filter((_, i) => i !== index))

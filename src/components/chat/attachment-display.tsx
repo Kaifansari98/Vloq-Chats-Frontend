@@ -93,14 +93,18 @@ function AudioAttachmentPlayer({
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1);
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
+  const hackingDurationRef = useRef(false);
 
   const bars = useMemo(() => {
     const seed = track.name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) +
       (track.sizeBytes % 99991);
     return generateBars(seed);
   }, [track.name, track.sizeBytes]);
+
+  const cardWidth = duration > 0
+    ? Math.min(400, Math.max(260, Math.round(200 + duration * 15)))
+    : 280;
 
   const progress = duration > 0 ? currentTime / duration : 0;
   const activeBars = Math.floor(progress * BAR_COUNT);
@@ -126,12 +130,6 @@ function AudioAttachmentPlayer({
     setHoveredBar(Math.min(BAR_COUNT - 1, Math.floor(ratio * BAR_COUNT)));
   }
 
-  function cycleRate() {
-    const next = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
-    setPlaybackRate(next);
-    if (audioRef.current) audioRef.current.playbackRate = next;
-  }
-
   function handleDownload() {
     const a = document.createElement("a");
     a.href = track.url;
@@ -141,31 +139,50 @@ function AudioAttachmentPlayer({
 
   return (
     <div
-      className={`flex w-[300px] flex-col gap-2 rounded-2xl border px-3.5 py-3 ${
+      style={{ width: cardWidth, maxWidth: "calc(75vw - 32px)" }}
+      className={`flex flex-col gap-2 rounded-2xl border px-3.5 py-3 ${
         isOwn
-          ? "border-white/10 bg-blue-600/40"
+          ? "border-white/10 bg-blue-500"
           : "border-slate-200 bg-white dark:border-white/8 dark:bg-white/6"
       }`}
     >
-      {/* Filename */}
-      <p
-        className={`truncate text-[11px] font-semibold leading-none ${
-          isOwn ? "text-blue-100/90" : "text-slate-600 dark:text-slate-300"
-        }`}
-      >
-        {track.name}
-      </p>
-
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio
         ref={audioRef}
         src={track.url}
-        onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
+        onTimeUpdate={() => {
+          if (hackingDurationRef.current) return;
+          setCurrentTime(audioRef.current?.currentTime ?? 0);
+        }}
         onLoadedMetadata={() => {
-          setDuration(audioRef.current?.duration ?? 0);
+          const audio = audioRef.current;
+          if (!audio) return;
+          if (isFinite(audio.duration) && audio.duration > 0) {
+            setDuration(audio.duration);
+            setIsLoading(false);
+          } else {
+            // webm recorded by MediaRecorder has no duration header — seek to end to force it
+            hackingDurationRef.current = true;
+            audio.currentTime = 1e100;
+          }
+        }}
+        onDurationChange={() => {
+          const audio = audioRef.current;
+          if (!audio || !isFinite(audio.duration) || audio.duration <= 0) return;
+          setDuration(audio.duration);
+          if (hackingDurationRef.current) {
+            hackingDurationRef.current = false;
+            audio.currentTime = 0;
+          }
           setIsLoading(false);
         }}
-        onCanPlay={() => setIsLoading(false)}
+        onCanPlay={() => {
+          const audio = audioRef.current;
+          if (audio && isFinite(audio.duration) && audio.duration > 0) {
+            setDuration(audio.duration);
+          }
+          setIsLoading(false);
+        }}
         onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
@@ -236,46 +253,21 @@ function AudioAttachmentPlayer({
             })}
           </div>
 
-          {/* Scrubber dot */}
+          {/* Scrubber dot — spring-animated for smooth playback */}
           {duration > 0 && (
-            <div
-              className={`pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full shadow ${
+            <motion.div
+              className={`pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-md ${
                 isOwn ? "bg-white" : "bg-blue-500"
               }`}
-              style={{ left: `${progress * 100}%` }}
+              animate={{ left: `${progress * 100}%` }}
+              transition={{ type: "spring", stiffness: 420, damping: 38, mass: 0.3 }}
             />
           )}
         </div>
 
-        {/* Speed + Download */}
-        <div className="flex flex-col items-center gap-1.5">
-          <button
-            type="button"
-            onClick={cycleRate}
-            className={`min-w-[30px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold tabular-nums transition-colors ${
-              isOwn
-                ? "bg-white/20 text-white hover:bg-white/30"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/16"
-            }`}
-          >
-            {playbackRate === 1 ? "1×" : playbackRate === 1.5 ? "1.5×" : "2×"}
-          </button>
-          <button
-            type="button"
-            onClick={handleDownload}
-            title="Download"
-            className={`transition-colors ${
-              isOwn
-                ? "text-white/55 hover:text-white"
-                : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-            }`}
-          >
-            <Download className="h-3.5 w-3.5" />
-          </button>
-        </div>
       </div>
 
-      {/* Bottom row: current / total · format */}
+      {/* Bottom row: current / total + download */}
       <div className="flex items-center justify-between px-0.5">
         <span
           className={`text-[10px] tabular-nums font-medium ${
@@ -284,13 +276,18 @@ function AudioAttachmentPlayer({
         >
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
-        <span
-          className={`text-[10px] ${
-            isOwn ? "text-white/30" : "text-slate-300 dark:text-slate-600"
+        <button
+          type="button"
+          onClick={handleDownload}
+          title="Download"
+          className={`transition-colors ${
+            isOwn
+              ? "text-white/55 hover:text-white"
+              : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
           }`}
         >
-          {track.mimeType === "audio/mpeg" ? "mp3" : "wav"}
-        </span>
+          <Download className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   );
@@ -314,11 +311,9 @@ export function AttachmentDisplay({
   if (attachments.length === 0) return null;
 
   const images = attachments.filter((a) => a.attachmentType === "IMAGE");
-  const audioFiles = attachments.filter(
-    (a) => a.mimeType === "audio/mpeg" || a.mimeType === "audio/wav",
-  );
+  const audioFiles = attachments.filter((a) => a.mimeType.startsWith("audio/"));
   const docs = attachments.filter(
-    (a) => a.attachmentType !== "IMAGE" && a.mimeType !== "audio/mpeg" && a.mimeType !== "audio/wav",
+    (a) => a.attachmentType !== "IMAGE" && !a.mimeType.startsWith("audio/"),
   );
   const imageRows = getImageAttachmentRows(images);
 

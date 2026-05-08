@@ -10,6 +10,7 @@ export type AuthenticatedUser = {
   email: string;
   organizationName: string;
   organizationEmail: string;
+  userTypeCode: string;
 };
 
 export type LoginResponse = {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, ImageIcon, Paperclip, Send, X } from "lucide-react";
+import { FileText, ImageIcon, Mic, Paperclip, Pause, Play, Send, Trash2, X } from "lucide-react";
 import { AttachmentDisplay } from "@/components/chat/attachment-display";
 import { NotificationBell } from "@/components/chat/notification-bell";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
@@ -55,6 +55,7 @@ type ChatWindowProps = {
   onSendMessage: () => void;
   onFileSelect: (files: File[]) => void;
   onRemoveFile: (index: number) => void;
+  onSendVoiceMessage?: (file: File) => void;
 };
 
 // ─── allowed file types ───────────────────────────────────────────────────────
@@ -784,6 +785,102 @@ function DragDropOverlay({
   );
 }
 
+// ─── voice recording bar ─────────────────────────────────────────────────────
+
+function RecordingBar({
+  recordingState,
+  seconds,
+  barHeights,
+  onCancel,
+  onTogglePause,
+  onSend,
+}: {
+  recordingState: "recording" | "paused";
+  seconds: number;
+  barHeights: number[];
+  onCancel: () => void;
+  onTogglePause: () => void;
+  onSend: () => void;
+}) {
+  function fmt(secs: number) {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 dark:border-white/8 dark:bg-white/5">
+      {/* Cancel */}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="shrink-0 text-slate-400 transition-colors hover:text-rose-500 dark:text-slate-500 dark:hover:text-rose-400"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+
+      {/* Status + timer */}
+      <div className="flex shrink-0 items-center gap-2">
+        {recordingState === "recording" ? (
+          <motion.span
+            animate={{ opacity: [1, 0.2, 1] }}
+            transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+            className="h-2 w-2 rounded-full bg-rose-500"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={onTogglePause}
+            className="text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+          >
+            <Play className="h-3.5 w-3.5 fill-current" />
+          </button>
+        )}
+        <span className="min-w-[28px] text-[12px] font-medium tabular-nums text-slate-600 dark:text-slate-300">
+          {fmt(seconds)}
+        </span>
+      </div>
+
+      {/* Waveform */}
+      <div className="flex h-8 flex-1 items-end gap-[2px] overflow-hidden">
+        {barHeights.map((h, i) => (
+          <div
+            key={i}
+            style={{ height: `${Math.round(Math.max(8, h * 92))}%` }}
+            className={`flex-1 rounded-full ${
+              recordingState === "recording" && i === barHeights.length - 1
+                ? "bg-blue-500"
+                : "bg-slate-300 dark:bg-slate-600"
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Pause / Resume */}
+      <button
+        type="button"
+        onClick={onTogglePause}
+        className="shrink-0 text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-white"
+      >
+        {recordingState === "recording" ? (
+          <Pause className="h-4 w-4 fill-current" />
+        ) : (
+          <Mic className="h-4 w-4" />
+        )}
+      </button>
+
+      {/* Send */}
+      <button
+        type="button"
+        onClick={onSend}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white shadow-[0_4px_14px_rgba(59,130,246,0.4)] transition-colors hover:bg-blue-400"
+      >
+        <Send className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 // ─── main component ───────────────────────────────────────────────────────────
 
 export function ChatWindow({
@@ -799,6 +896,7 @@ export function ChatWindow({
   onSendMessage,
   onFileSelect,
   onRemoveFile,
+  onSendVoiceMessage,
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -815,6 +913,21 @@ export function ChatWindow({
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const pendingSelectionRef = useRef<number | null>(null);
   const dragDepthRef = useRef(0);
+
+  // ── voice recording ────────────────────────────────────────────────────────
+  type RecordingState = "idle" | "recording" | "paused";
+  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [liveBarHeights, setLiveBarHeights] = useState<number[]>(Array(48).fill(0.05));
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const waveformSamplerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const waveformHistoryRef = useRef<number[]>(Array(48).fill(0.05));
+  const pendingSendRef = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1003,6 +1116,118 @@ export function ChatWindow({
     syncMentionState(nextValue, nextCaretIndex);
   }
 
+  // ── recording helpers ─────────────────────────────────────────────────────
+
+  function stopRecordingTimers() {
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    if (waveformSamplerRef.current) { clearInterval(waveformSamplerRef.current); waveformSamplerRef.current = null; }
+  }
+
+  function startWaveformSampling() {
+    waveformSamplerRef.current = setInterval(() => {
+      if (!analyserRef.current) return;
+      const data = new Uint8Array(analyserRef.current.frequencyBinCount);
+      analyserRef.current.getByteTimeDomainData(data);
+      let sumSq = 0;
+      for (const v of data) { const n = (v - 128) / 128; sumSq += n * n; }
+      const amplitude = Math.min(0.95, 0.05 + Math.sqrt(sumSq / data.length) * 4);
+      waveformHistoryRef.current = [...waveformHistoryRef.current.slice(1), amplitude];
+      setLiveBarHeights([...waveformHistoryRef.current]);
+    }, 100);
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      const AudioCtxClass = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const audioCtx = new AudioCtxClass();
+      audioContextRef.current = audioCtx;
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const mimeType =
+        MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" :
+        MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" :
+        MediaRecorder.isTypeSupported("audio/ogg;codecs=opus") ? "audio/ogg;codecs=opus" :
+        "audio/mp4";
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+      recordingChunksRef.current = [];
+      waveformHistoryRef.current = Array(48).fill(0.05);
+
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordingChunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        const mt = recorder.mimeType;
+        const blob = new Blob(recordingChunksRef.current, { type: mt });
+        if (pendingSendRef.current) {
+          const ext = mt.includes("webm") ? "webm" : mt.includes("ogg") ? "ogg" : "mp4";
+          const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: mt.split(";")[0] });
+          onSendVoiceMessage?.(file);
+        }
+        pendingSendRef.current = false;
+        audioContextRef.current?.close();
+        audioContextRef.current = null;
+        analyserRef.current = null;
+        mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
+      };
+
+      recorder.start(100);
+      setRecordingState("recording");
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+      startWaveformSampling();
+    } catch {
+      setFileError("Microphone access was denied. Please allow mic access to record audio.");
+    }
+  }
+
+  function cancelRecording() {
+    pendingSendRef.current = false;
+    stopRecordingTimers();
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    mediaRecorderRef.current = null;
+    setRecordingState("idle");
+    setRecordingSeconds(0);
+    waveformHistoryRef.current = Array(48).fill(0.05);
+    setLiveBarHeights(Array(48).fill(0.05));
+  }
+
+  function toggleRecordingPause() {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
+    if (recordingState === "recording") {
+      recorder.pause();
+      stopRecordingTimers();
+      setRecordingState("paused");
+    } else if (recordingState === "paused") {
+      recorder.resume();
+      setRecordingState("recording");
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+      startWaveformSampling();
+    }
+  }
+
+  function sendRecording() {
+    pendingSendRef.current = true;
+    stopRecordingTimers();
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    else pendingSendRef.current = false;
+    mediaRecorderRef.current = null;
+    setRecordingState("idle");
+    setRecordingSeconds(0);
+    waveformHistoryRef.current = Array(48).fill(0.05);
+    setLiveBarHeights(Array(48).fill(0.05));
+  }
+
   const canSend =
     (message.trim().length > 0 || selectedFiles.length > 0) &&
     !isSendingMessage;
@@ -1162,12 +1387,17 @@ export function ChatWindow({
                         )}
 
                         {chatMessage.attachments.some(
-                          (a) => a.mimeType === "audio/mpeg" || a.mimeType === "audio/wav",
+                          (a) => a.mimeType.startsWith("audio/"),
                         ) && (
                           <div className="mb-1.5">
+                            {!chatMessage.isOwnMessage && (
+                              <p className="mb-1.5 px-0.5 text-[12px] font-semibold leading-none text-slate-700 dark:text-slate-200">
+                                {chatMessage.senderName}
+                              </p>
+                            )}
                             <AttachmentDisplay
                               attachments={chatMessage.attachments.filter(
-                                (a) => a.mimeType === "audio/mpeg" || a.mimeType === "audio/wav",
+                                (a) => a.mimeType.startsWith("audio/"),
                               )}
                               isOwn={chatMessage.isOwnMessage}
                             />
@@ -1179,8 +1409,7 @@ export function ChatWindow({
                             (attachment) =>
                               attachment.attachmentType !== "IMAGE" &&
                               attachment.mimeType !== "application/pdf" &&
-                              attachment.mimeType !== "audio/mpeg" &&
-                              attachment.mimeType !== "audio/wav",
+                              !attachment.mimeType.startsWith("audio/"),
                           )) && (
                           <div
                             className={`max-w-[75%] px-4 py-2.5 ${
@@ -1199,8 +1428,7 @@ export function ChatWindow({
                                 (attachment) =>
                                   attachment.attachmentType !== "IMAGE" &&
                                   attachment.mimeType !== "application/pdf" &&
-                                  attachment.mimeType !== "audio/mpeg" &&
-                                  attachment.mimeType !== "audio/wav",
+                                  !attachment.mimeType.startsWith("audio/"),
                               )}
                               isOwn={chatMessage.isOwnMessage}
                             />
@@ -1402,6 +1630,16 @@ export function ChatWindow({
             onChange={handleFileInputChange}
           />
 
+          {recordingState !== "idle" ? (
+            <RecordingBar
+              recordingState={recordingState}
+              seconds={recordingSeconds}
+              barHeights={liveBarHeights}
+              onCancel={cancelRecording}
+              onTogglePause={toggleRecordingPause}
+              onSend={sendRecording}
+            />
+          ) : (
           <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/8 rounded-2xl focus-within:border-blue-400/40 dark:focus-within:border-blue-500/25 transition-colors overflow-hidden">
             {/* Selected files preview */}
             {selectedFiles.length > 0 && (
@@ -1525,6 +1763,14 @@ export function ChatWindow({
                 <EmojiPickerButton
                   onSelect={(emoji) => onMessageChange(message + emoji)}
                 />
+                <button
+                  type="button"
+                  onClick={() => void startRecording()}
+                  title="Record voice message"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600 dark:text-slate-600 dark:hover:bg-white/8 dark:hover:text-slate-400"
+                >
+                  <Mic className="h-4 w-4" />
+                </button>
               </div>
 
               <button
@@ -1538,6 +1784,7 @@ export function ChatWindow({
               </button>
             </div>
           </div>
+          )}
         </div>
         </div>
       </main>
