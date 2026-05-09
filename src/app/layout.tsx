@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vloq Chats",
+  title: "ButterFly AI - Chats",
   description: "Workspace for Vloq chat operations and collaboration.",
 };
 
