@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion"
 import { Check, ChevronLeft, ChevronRight, MessageSquarePlus, Search, Users } from "lucide-react"
+import Image from "next/image"
 import { UserMenu } from "@/components/chat/user-menu"
 import type { ChatConversation } from "@/components/chat/chat-window"
 import type { ChatListFilter } from "@/hooks/use-direct-chats"
@@ -57,10 +58,6 @@ export function ChatSidebar({
   onFilterChange,
   onCreateGroup,
 }: ChatSidebarProps) {
-  const orgInitials = user?.organizationName
-    ? user.organizationName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-    : "V"
-
   return (
     <div className="relative shrink-0">
       <motion.aside
@@ -78,7 +75,13 @@ export function ChatSidebar({
             isSidebarCollapsed ? "justify-center" : "gap-3"
           }`}>
             <div className="w-9 h-9 shrink-0 rounded-xl bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-              <span className="text-[13px] font-bold text-white">{orgInitials}</span>
+              <Image
+                src="/favicon.ico"
+                alt="ButterFly AI"
+                width={22}
+                height={22}
+                className="h-[22px] w-[22px]"
+              />
             </div>
             <AnimatePresence initial={false}>
               {!isSidebarCollapsed && (
