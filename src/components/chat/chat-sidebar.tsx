@@ -74,7 +74,7 @@ export function ChatSidebar({
           <div className={`flex min-w-0 items-center ${
             isSidebarCollapsed ? "justify-center" : "gap-3"
           }`}>
-            <div className="w-9 h-9 shrink-0 rounded-xl bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+            <div className="w-9 h-9 shrink-0 rounded-xl bg-white flex items-center justify-center">
               <Image
                 src="/favicon.ico"
                 alt="ButterFly AI"
