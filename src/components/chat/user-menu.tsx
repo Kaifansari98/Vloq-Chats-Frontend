@@ -237,7 +237,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
           </div>
 
           <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-white mb-1.5">
-            Log out of Vloq Chats?
+            Log out of ButterFly Chats?
           </Dialog.Title>
           <Dialog.Description className="text-[13px] text-slate-500 leading-relaxed mb-6">
             You&apos;ll be signed out of your account and redirected to the
