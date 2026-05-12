@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { useUserRole } from "@/hooks/use-user-role";
 import {
   useOrganizationMembers,
   type Member,
@@ -243,6 +244,7 @@ function groupChatToConversation(
 
 export function ChatLayout() {
   const { user, token } = useAuth();
+  const { isAdmin } = useUserRole(user?.userTypeCode);
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(() =>
@@ -814,7 +816,7 @@ export function ChatLayout() {
         isSidebarCollapsed={isSidebarCollapsed}
         search={search}
         activeFilter={activeFilter}
-        isAdmin={user?.userTypeCode === "ADMIN"}
+        isAdmin={isAdmin}
         user={user}
         onSelectConversation={selectConversation}
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}

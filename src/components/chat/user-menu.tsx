@@ -14,6 +14,7 @@ import {
 import { PasswordStrengthField } from "@/components/comp-51";
 import { SettingsModal } from "@/components/chat/settings-modal";
 import { useAuth } from "@/hooks/use-auth";
+import { useUserRole } from "@/hooks/use-user-role";
 import { AUTH_TOKEN_COOKIE, AUTH_USER_COOKIE } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -24,13 +25,16 @@ type UserMenuProps = {
 
 export function UserMenu({ collapsed = false }: UserMenuProps) {
   const { user } = useAuth();
+  const { isAdmin } = useUserRole(user?.userTypeCode);
   const router = useRouter();
+  const [roles, setRoles] = useState<Array<{ id: number; code: string }>>([]);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedRoleCode, setSelectedRoleCode] = useState("MEMBER");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -41,6 +45,23 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
       (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
   }, []);
+
+  useEffect(() => {
+    if (!createUserOpen || !isAdmin) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const response = await api.get<{
+          data: Array<{ id: number; code: string }>;
+        }>("/users/roles");
+        setRoles(response.data.data);
+      } catch {
+        setRoles([]);
+      }
+    })();
+  }, [createUserOpen, isAdmin]);
 
   function confirmLogout() {
     void (async () => {
@@ -81,10 +102,16 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
     setIsSubmitting(true);
 
     try {
+      const selectedRole = roles.find((role) => role.code === selectedRoleCode);
+
+      if (!selectedRole) {
+        setSubmitError("User role is required");
+        return;
+      }
+
       const profile = await api.get<{
         user: {
           organizationId: number;
-          userTypeId: number;
         };
       }>("/users/me");
 
@@ -93,13 +120,14 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
         email: email.trim(),
         password,
         organizationId: profile.data.user.organizationId,
-        userTypeId: profile.data.user.userTypeId,
+        userTypeId: selectedRole.id,
         provider: "EMAIL",
       });
 
       setName("");
       setEmail("");
       setPassword("");
+      setSelectedRoleCode("MEMBER");
       setCreateUserOpen(false);
     } catch (error: unknown) {
       const message =
@@ -182,7 +210,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
             </div>
 
             {/* Menu items — admin only */}
-            {user?.userTypeCode === "ADMIN" && (
+            {isAdmin && (
               <>
                 <div className="p-1.5">
                   <DropdownMenu.Item
@@ -308,6 +336,20 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
               </div>
 
               <div>
+                <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+                  User Role
+                </label>
+                <select
+                  value={selectedRoleCode}
+                  onChange={(e) => setSelectedRoleCode(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
+                >
+                  <option value="MEMBER">Member</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </div>
+
+              <div>
                 <PasswordStrengthField
                   label="Password"
                   placeholder="Minimum 6 characters"
@@ -334,7 +376,8 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
                   isSubmitting ||
                   name.trim().length < 2 ||
                   email.trim().length === 0 ||
-                  password.length < 6
+                  password.length < 6 ||
+                  selectedRoleCode.length === 0
                 }
                 className="flex-1 h-10 rounded-xl bg-blue-500 text-sm font-medium text-white transition-colors hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
