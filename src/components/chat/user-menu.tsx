@@ -463,16 +463,18 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
                     <UserPlus className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                     Create User
                   </DropdownMenu.Item>
-                  <DropdownMenu.Item
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setManageUsersOpen(true);
-                    }}
-                    className={itemClass}
-                  >
-                    <Users className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                    Manage Users
-                  </DropdownMenu.Item>
+                  {isAdmin && (
+                    <DropdownMenu.Item
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setManageUsersOpen(true);
+                      }}
+                      className={itemClass}
+                    >
+                      <Users className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                      Manage Users
+                    </DropdownMenu.Item>
+                  )}
                   <DropdownMenu.Item
                     onSelect={(e) => {
                       e.preventDefault();
