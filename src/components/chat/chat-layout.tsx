@@ -59,12 +59,19 @@ function buildMessageMentions(
   content: string,
   participants: Array<{ id: number; name: string }>,
 ) {
-  const mentions: Array<{ mentionedUserId: number; offset: number; length: number }> = [];
+  const mentions: Array<{
+    mentionedUserId: number;
+    offset: number;
+    length: number;
+  }> = [];
 
   for (const participant of [...participants].sort(
     (left, right) => right.name.length - left.name.length,
   )) {
-    const regex = new RegExp(`@${escapeRegExp(participant.name)}(?=\\s|$)`, "g");
+    const regex = new RegExp(
+      `@${escapeRegExp(participant.name)}(?=\\s|$)`,
+      "g",
+    );
 
     let match: RegExpExecArray | null = regex.exec(content);
     while (match) {
@@ -78,12 +85,13 @@ function buildMessageMentions(
   }
 
   return mentions
-    .filter((mention, index, all) =>
-      all.findIndex(
-        (candidate) =>
-          candidate.mentionedUserId === mention.mentionedUserId &&
-          candidate.offset === mention.offset,
-      ) === index,
+    .filter(
+      (mention, index, all) =>
+        all.findIndex(
+          (candidate) =>
+            candidate.mentionedUserId === mention.mentionedUserId &&
+            candidate.offset === mention.offset,
+        ) === index,
     )
     .sort((left, right) => left.offset - right.offset);
 }
@@ -268,7 +276,9 @@ export function ChatLayout() {
   const socketRef = useRef<ChatSocket | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingTargetRef = useRef<
-    { type: "direct"; participantUserId: number } | { type: "group"; conversationUuid: string } | null
+    | { type: "direct"; participantUserId: number }
+    | { type: "group"; conversationUuid: string }
+    | null
   >(null);
   const isTypingRef = useRef(false);
 
@@ -339,9 +349,8 @@ export function ChatLayout() {
 
               return {
                 ...chat,
-                unreadCount: isOwnMessage || isActiveGroup
-                  ? 0
-                  : chat.unreadCount + 1,
+                unreadCount:
+                  isOwnMessage || isActiveGroup ? 0 : chat.unreadCount + 1,
                 lastMessage: {
                   uuid: incomingMessage.uuid,
                   content: incomingMessage.content,
@@ -488,43 +497,54 @@ export function ChatLayout() {
   const { data, isLoading } = useOrganizationMembers(1, debouncedSearch);
   const { data: directChatsData, isLoading: isLoadingDirectChats } =
     useDirectChats(1, debouncedSearch, activeFilter);
-  const directChatsByMemberUuid = new Map(
-    (directChatsData?.data ?? [])
-      .filter((chat): chat is DirectChat => chat.type === "DIRECT")
-      .map((chat) => [chat.otherParticipant.uuid, chat]),
-  );
+  const baseConversations = (() => {
+    const allChats = directChatsData?.data ?? [];
 
-  const baseConversations =
-    activeFilter === "ALL"
-      ? (data?.data ?? [])
-          .filter((member) => member.uuid !== user?.uuid)
-          .map((member) =>
-            memberToConversation(
-              member,
-              directChatsByMemberUuid.get(member.uuid),
-            ),
-          )
-      : (directChatsData?.data ?? []).map((chat, index) =>
-          chat.type === "GROUP"
-            ? groupChatToConversation(chat, GRADIENTS[index % GRADIENTS.length])
-            : directChatToConversation(
-                chat,
-                GRADIENTS[chat.otherParticipant.id % GRADIENTS.length],
-              ),
-        );
+    // Build conversation items for every chat (DIRECT + GROUP) returned by the API
+    const chatItems = allChats.map((chat, index) =>
+      chat.type === "GROUP"
+        ? groupChatToConversation(chat, GRADIENTS[index % GRADIENTS.length])
+        : directChatToConversation(
+            chat,
+            GRADIENTS[chat.otherParticipant.id % GRADIENTS.length],
+          ),
+    );
+
+    if (activeFilter !== "ALL") return chatItems;
+
+    // For ALL: also surface members who have never sent/received a direct message
+    const membersWithDirectChat = new Set(
+      allChats
+        .filter((chat): chat is DirectChat => chat.type === "DIRECT")
+        .map((chat) => chat.otherParticipant.uuid),
+    );
+
+    const memberItems = (data?.data ?? [])
+      .filter(
+        (member) =>
+          member.uuid !== user?.uuid && !membersWithDirectChat.has(member.uuid),
+      )
+      .map((member) => memberToConversation(member, undefined));
+
+    return [...chatItems, ...memberItems];
+  })();
 
   const conversations = baseConversations
     .map((conversation) => ({
       ...conversation,
       online: onlineUserIds.includes(conversation.memberId),
-      isTyping: conversation.memberId === 0
-        ? groupTypingUsers.some((entry) => entry.conversationUuid === conversation.id)
-        : typingUserIds.includes(conversation.memberId),
+      isTyping:
+        conversation.memberId === 0
+          ? groupTypingUsers.some(
+              (entry) => entry.conversationUuid === conversation.id,
+            )
+          : typingUserIds.includes(conversation.memberId),
       onlineParticipantNames: (conversation as ChatConversation).participants
         ?.filter((p) => onlineUserIds.includes(p.id))
         .map((p) => p.name.split(" ")[0]),
-      onlineParticipants: (conversation as ChatConversation).participants
-        ?.filter((p) => onlineUserIds.includes(p.id)),
+      onlineParticipants: (
+        conversation as ChatConversation
+      ).participants?.filter((p) => onlineUserIds.includes(p.id)),
     }))
     .sort((a, b) => {
       if (a.latestActivityAt !== b.latestActivityAt) {
@@ -535,14 +555,16 @@ export function ChatLayout() {
     });
 
   const effectiveSelectedId =
-    selectedId && conversations.some((conversation) => conversation.id === selectedId)
+    selectedId &&
+    conversations.some((conversation) => conversation.id === selectedId)
       ? selectedId
       : activeFilter === "ALL"
         ? (conversations[0]?.id ?? null)
         : null;
   const selected = conversations.find((c) => c.id === effectiveSelectedId);
   const isGroup = selected?.memberId === 0;
-  const directMemberId = !isGroup && selected?.memberId ? selected.memberId : undefined;
+  const directMemberId =
+    !isGroup && selected?.memberId ? selected.memberId : undefined;
   const groupConvUuid = isGroup ? selected?.id : undefined;
 
   const { data: directMessagesData, isLoading: isLoadingDirectMessages } =
@@ -551,7 +573,9 @@ export function ChatLayout() {
     useGroupMessages(groupConvUuid);
 
   const messagesData = isGroup ? groupMessagesData : directMessagesData;
-  const isLoadingMessages = isGroup ? isLoadingGroupMessages : isLoadingDirectMessages;
+  const isLoadingMessages = isGroup
+    ? isLoadingGroupMessages
+    : isLoadingDirectMessages;
 
   const sendDirectMessage = useSendDirectMessage(directMemberId);
   const uploadDirectMessage = useUploadDirectMessage(directMemberId);
@@ -591,9 +615,15 @@ export function ChatLayout() {
     if (!selected) return;
 
     if (selected.memberId === 0) {
-      typingTargetRef.current = { type: "group", conversationUuid: selected.id };
+      typingTargetRef.current = {
+        type: "group",
+        conversationUuid: selected.id,
+      };
     } else if (selected.memberId) {
-      typingTargetRef.current = { type: "direct", participantUserId: selected.memberId };
+      typingTargetRef.current = {
+        type: "direct",
+        participantUserId: selected.memberId,
+      };
     } else {
       return;
     }
@@ -633,9 +663,15 @@ export function ChatLayout() {
     if (!selected) {
       typingTargetRef.current = null;
     } else if (selected.memberId === 0) {
-      typingTargetRef.current = { type: "group", conversationUuid: selected.id };
+      typingTargetRef.current = {
+        type: "group",
+        conversationUuid: selected.id,
+      };
     } else if (selected.memberId) {
-      typingTargetRef.current = { type: "direct", participantUserId: selected.memberId };
+      typingTargetRef.current = {
+        type: "direct",
+        participantUserId: selected.memberId,
+      };
     } else {
       typingTargetRef.current = null;
     }
@@ -643,7 +679,13 @@ export function ChatLayout() {
   }, [selectedMemberId, selectedConversationId]);
 
   useEffect(() => {
-    if (!selected?.memberId || selected.memberId === 0 || isLoadingMessages || !messagesData?.data?.length) return;
+    if (
+      !selected?.memberId ||
+      selected.memberId === 0 ||
+      isLoadingMessages ||
+      !messagesData?.data?.length
+    )
+      return;
     if (!selected.unread || markDirectChatRead.isPending) return;
 
     markDirectChatRead.mutate(selected.memberId);
@@ -695,14 +737,16 @@ export function ChatLayout() {
       isOwnMessage: true,
       createdAt: new Date().toISOString(),
       status: "sent",
-      attachments: [{
-        uuid: `pending-${file.name}-${file.size}`,
-        attachmentType: "DOCUMENT",
-        name: file.name,
-        url: objectUrl,
-        mimeType: file.type,
-        sizeBytes: file.size,
-      }],
+      attachments: [
+        {
+          uuid: `pending-${file.name}-${file.size}`,
+          attachmentType: "DOCUMENT",
+          name: file.name,
+          url: objectUrl,
+          mimeType: file.type,
+          sizeBytes: file.size,
+        },
+      ],
       isPending: true,
       uploadProgress: 0,
     };
@@ -711,16 +755,27 @@ export function ChatLayout() {
 
     const updateProgress = (pct: number) => {
       setPendingMessages((prev) =>
-        prev.map((m) => m.uuid === pendingId ? { ...m, uploadProgress: pct } : m),
+        prev.map((m) =>
+          m.uuid === pendingId ? { ...m, uploadProgress: pct } : m,
+        ),
       );
     };
 
     try {
       if (isGroup) {
-        await uploadGroupMessage.mutateAsync({ content: "", files: [file], mentions: [], onUploadProgress: updateProgress });
+        await uploadGroupMessage.mutateAsync({
+          content: "",
+          files: [file],
+          mentions: [],
+          onUploadProgress: updateProgress,
+        });
       } else {
         if (!selected.memberId) return;
-        await uploadDirectMessage.mutateAsync({ content: "", files: [file], onUploadProgress: updateProgress });
+        await uploadDirectMessage.mutateAsync({
+          content: "",
+          files: [file],
+          onUploadProgress: updateProgress,
+        });
       }
     } finally {
       URL.revokeObjectURL(objectUrl);
@@ -785,7 +840,9 @@ export function ChatLayout() {
 
     const updateProgress = (pct: number) => {
       setPendingMessages((prev) =>
-        prev.map((m) => m.uuid === pendingId ? { ...m, uploadProgress: pct } : m),
+        prev.map((m) =>
+          m.uuid === pendingId ? { ...m, uploadProgress: pct } : m,
+        ),
       );
     };
 
@@ -795,10 +852,19 @@ export function ChatLayout() {
           content,
           "participants" in selected ? (selected.participants ?? []) : [],
         );
-        await uploadGroupMessage.mutateAsync({ content, files: filesToUpload, mentions, onUploadProgress: updateProgress });
+        await uploadGroupMessage.mutateAsync({
+          content,
+          files: filesToUpload,
+          mentions,
+          onUploadProgress: updateProgress,
+        });
       } else {
         if (!selected.memberId) return;
-        await uploadDirectMessage.mutateAsync({ content, files: filesToUpload, onUploadProgress: updateProgress });
+        await uploadDirectMessage.mutateAsync({
+          content,
+          files: filesToUpload,
+          onUploadProgress: updateProgress,
+        });
       }
     } finally {
       for (const url of objectUrls) URL.revokeObjectURL(url);
@@ -845,17 +911,25 @@ export function ChatLayout() {
           isLoadingMessages={isLoadingMessages}
           selectedFiles={selectedFiles}
           isSendingMessage={
-            sendDirectMessage.isPending || uploadDirectMessage.isPending ||
-            sendGroupMessage.isPending || uploadGroupMessage.isPending
+            sendDirectMessage.isPending ||
+            uploadDirectMessage.isPending ||
+            sendGroupMessage.isPending ||
+            uploadGroupMessage.isPending
           }
-          isPeerTyping={selected.memberId === 0
-            ? groupTypingUsers.some((entry) => entry.conversationUuid === selected.id)
-            : typingUserIds.includes(selected.memberId)}
-          typingNames={selected.memberId === 0
-            ? groupTypingUsers
-                .filter((entry) => entry.conversationUuid === selected.id)
-                .map((entry) => entry.userName.split(" ")[0])
-            : []}
+          isPeerTyping={
+            selected.memberId === 0
+              ? groupTypingUsers.some(
+                  (entry) => entry.conversationUuid === selected.id,
+                )
+              : typingUserIds.includes(selected.memberId)
+          }
+          typingNames={
+            selected.memberId === 0
+              ? groupTypingUsers
+                  .filter((entry) => entry.conversationUuid === selected.id)
+                  .map((entry) => entry.userName.split(" ")[0])
+              : []
+          }
           onMessageChange={handleMessageChange}
           onSendMessage={sendMessage}
           onSendVoiceMessage={sendVoiceMessage}
