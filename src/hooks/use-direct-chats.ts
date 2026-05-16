@@ -12,6 +12,7 @@ export type DirectChat = {
     uuid: string
     name: string
     email: string
+    profile_pic_url?: string | null
   }
   lastMessage: {
     uuid: string
@@ -33,6 +34,7 @@ export type GroupChat = {
     uuid: string
     name: string
     email: string
+    profile_pic_url?: string | null
   }>
   lastMessage: {
     uuid: string

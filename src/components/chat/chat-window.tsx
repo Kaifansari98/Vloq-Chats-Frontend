@@ -24,9 +24,10 @@ export type ChatConversation = {
   online: boolean;
   isTyping: boolean;
   gradient: string;
-  participants?: Array<{ id: number; name: string; initials: string }>;
+  participants?: Array<{ id: number; name: string; initials: string; profile_pic_url?: string | null }>;
   onlineParticipantNames?: string[];
-  onlineParticipants?: Array<{ id: number; name: string; initials: string }>;
+  onlineParticipants?: Array<{ id: number; name: string; initials: string; profile_pic_url?: string | null }>;
+  profile_pic_url?: string | null;
 };
 
 export type ChatMessage = {
@@ -93,6 +94,7 @@ type ParticipantPreview = {
   id: number;
   name: string;
   initials: string;
+  profile_pic_url?: string | null;
 };
 
 type ActiveMention = {
@@ -130,12 +132,22 @@ function MemberPopoverContent({
 
           return (
             <div key={item.id} className="flex flex-col items-center text-center">
-              <div
-                title={item.name}
-                className={`flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br ${itemGradient} text-[10px] font-semibold text-white`}
-              >
-                {item.initials}
-              </div>
+              {item.profile_pic_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.profile_pic_url}
+                  alt={item.name}
+                  title={item.name}
+                  className="h-8 w-8 rounded-full object-cover"
+                />
+              ) : (
+                <div
+                  title={item.name}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br ${itemGradient} text-[10px] font-semibold text-white`}
+                >
+                  {item.initials}
+                </div>
+              )}
               <div className="mt-1 min-h-[24px] text-[10px] leading-tight text-slate-600 dark:text-slate-300">
                 <div>{firstName}</div>
                 <div>{secondName}</div>
@@ -206,9 +218,18 @@ function GroupParticipantsCluster({
               }
               whileHover={{ y: -2, scale: 1.04 }}
               transition={{ duration: 0.16, ease: "easeOut" }}
-              className={`flex h-8 w-8 items-center justify-center rounded-full border border-white/50 bg-linear-to-br ${gradient} text-[11px] font-semibold text-white shadow-[0_12px_24px_-16px_rgba(15,23,42,0.38)] dark:border-white/10 dark:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.85)]`}
+              className={`h-8 w-8 rounded-full border border-white/50 dark:border-white/10 shadow-[0_12px_24px_-16px_rgba(15,23,42,0.38)] dark:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.85)] overflow-hidden ${participant.profile_pic_url ? "" : `flex items-center justify-center bg-linear-to-br ${gradient} text-[11px] font-semibold text-white`}`}
             >
-              {participant.initials}
+              {participant.profile_pic_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={participant.profile_pic_url}
+                  alt={participant.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                participant.initials
+              )}
             </motion.button>
 
             <AnimatePresence>
@@ -1289,11 +1310,20 @@ export function ChatWindow({
         <div className="flex items-center justify-between px-6 h-[68px] border-b border-slate-200 dark:border-white/6 bg-white dark:bg-[#070d1e] shrink-0">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div
-                className={`w-9 h-9 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-[11px] font-semibold text-white`}
-              >
-                {selected.initials}
-              </div>
+              {!isGroup && selected.profile_pic_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={selected.profile_pic_url}
+                  alt={selected.name}
+                  className="w-9 h-9 rounded-full object-cover"
+                />
+              ) : (
+                <div
+                  className={`w-9 h-9 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-[11px] font-semibold text-white`}
+                >
+                  {selected.initials}
+                </div>
+              )}
               {!isGroup && selected.online && (
                 <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 rounded-full border-2 border-white dark:border-[#070d1e]" />
               )}

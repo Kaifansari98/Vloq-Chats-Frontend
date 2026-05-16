@@ -292,9 +292,18 @@ export function ChatSidebar({
                 >
                   {/* Avatar */}
                   <div className="relative shrink-0">
-                    <div className={`w-10 h-10 rounded-full bg-linear-to-br ${conv.gradient} flex items-center justify-center text-[11px] font-semibold text-white`}>
-                      {conv.initials}
-                    </div>
+                    {conv.profile_pic_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={conv.profile_pic_url}
+                        alt={conv.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className={`w-10 h-10 rounded-full bg-linear-to-br ${conv.gradient} flex items-center justify-center text-[11px] font-semibold text-white`}>
+                        {conv.initials}
+                      </div>
+                    )}
                     {conv.online && (
                       <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white dark:border-[#0b1425]" />
                     )}

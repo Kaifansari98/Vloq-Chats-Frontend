@@ -36,6 +36,16 @@ function memberInitials(name: string) {
 
 function MemberAvatar({ member, size = "md" }: { member: Member; size?: "sm" | "md" }) {
   const dim = size === "sm" ? "w-9 h-9 text-[10px]" : "w-11 h-11 text-[11px]"
+  if (member.profile_pic_url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={member.profile_pic_url}
+        alt={member.name}
+        className={`${dim} rounded-full object-cover shrink-0`}
+      />
+    )
+  }
   return (
     <div
       className={`${dim} rounded-full bg-linear-to-br ${memberGradient(member.id)} flex items-center justify-center font-semibold text-white shrink-0`}

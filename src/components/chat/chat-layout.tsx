@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
@@ -210,6 +210,7 @@ function directChatToConversation(
     online: false,
     isTyping: false,
     gradient,
+    profile_pic_url: directChat.otherParticipant.profile_pic_url ?? null,
   };
 }
 
@@ -246,6 +247,7 @@ function groupChatToConversation(
         .join("")
         .toUpperCase()
         .slice(0, 2),
+      profile_pic_url: p.profile_pic_url ?? null,
     })),
   };
 }
@@ -286,7 +288,9 @@ export function ChatLayout() {
     const chatFromUrl = searchParams.get("chat");
     if (!chatFromUrl) return;
 
-    setSelectedId(chatFromUrl);
+    startTransition(() => {
+      setSelectedId(chatFromUrl);
+    });
     localStorage.setItem("vloq:selectedChatId", chatFromUrl);
   }, [searchParams]);
 

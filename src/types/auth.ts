@@ -11,6 +11,7 @@ export type AuthenticatedUser = {
   organizationName: string;
   organizationEmail: string;
   userTypeCode: string;
+  profile_pic_url?: string | null;
 };
 
 export type LoginResponse = {

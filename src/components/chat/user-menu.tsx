@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, Dialog } from "radix-ui";
@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   UserPlus,
   Users,
+  UserCircle,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -19,6 +20,8 @@ import {
   UserRoundCheck,
   UserRoundX,
   X,
+  Camera,
+  Loader2,
 } from "lucide-react";
 import { PasswordStrengthField } from "@/components/comp-51";
 import { SettingsModal } from "@/components/chat/settings-modal";
@@ -94,6 +97,23 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [manageUsersOpen, setManageUsersOpen] = useState(false);
 
+  // Sidebar / header profile pic (fetched on mount, updated after save)
+  const [sidebarProfilePicUrl, setSidebarProfilePicUrl] = useState<string | null>(null);
+
+  // Update Profile state
+  const [updateProfileOpen, setUpdateProfileOpen] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profileRoleCode, setProfileRoleCode] = useState("MEMBER");
+  const [profilePassword, setProfilePassword] = useState("");
+  const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
+  const [profilePicPreview, setProfilePicPreview] = useState<string | null>(null);
+  const [currentProfilePicUrl, setCurrentProfilePicUrl] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const profilePicInputRef = useRef<HTMLInputElement>(null);
+
   // Create user form
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -141,8 +161,54 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
     document.documentElement.classList.toggle("dark", dark);
   }, []);
 
+  // Fetch profile pic URL on mount so avatars show it immediately
   useEffect(() => {
-    if ((!createUserOpen && !manageUsersOpen && !editUserOpen) || !isAdmin) {
+    void (async () => {
+      try {
+        const res = await api.get<{ user: { profile_pic_url: string | null } }>("/users/me");
+        setSidebarProfilePicUrl(res.data.user.profile_pic_url ?? null);
+      } catch {
+        // Non-fatal — keep null, initials will show
+      }
+    })();
+  }, []);
+
+  // Fetch current user profile when Update Profile modal opens
+  useEffect(() => {
+    if (!updateProfileOpen) return;
+
+    void (async () => {
+      setIsLoadingProfile(true);
+      setProfileError(null);
+      try {
+        const res = await api.get<{
+          user: {
+            uuid: string;
+            name: string;
+            email: string;
+            userTypeId: number;
+            profile_pic_url: string | null;
+          };
+        }>("/users/me");
+        const u = res.data.user;
+        setProfileName(u.name);
+        setProfileEmail(u.email);
+        setProfileRoleCode(user?.userTypeCode ?? "MEMBER");
+        setCurrentProfilePicUrl(u.profile_pic_url ?? null);
+        setProfilePicPreview(null);
+        setProfilePicFile(null);
+        setProfilePassword("");
+      } catch {
+        setProfileError("Failed to load profile");
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateProfileOpen]);
+
+  useEffect(() => {
+    if ((!createUserOpen && !manageUsersOpen && !editUserOpen && !updateProfileOpen) || !isAdmin) {
       return;
     }
 
@@ -156,7 +222,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
         setRoles([]);
       }
     })();
-  }, [createUserOpen, manageUsersOpen, editUserOpen, isAdmin]);
+  }, [createUserOpen, manageUsersOpen, editUserOpen, updateProfileOpen, isAdmin]);
 
   useEffect(() => {
     if (!manageUsersOpen || !isAdmin) return;
@@ -351,6 +417,71 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
     "hover:bg-slate-100 focus:bg-slate-100 hover:text-slate-900 focus:text-slate-900 " +
     "dark:hover:bg-white/6 dark:focus:bg-white/6 dark:hover:text-white dark:focus:text-white";
 
+  function handleProfilePicChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      toast.error("Only JPEG and PNG images are allowed.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Profile picture must be under 5 MB.");
+      return;
+    }
+    setProfilePicFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setProfilePicPreview(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  async function handleSaveProfile() {
+    if (!user) return;
+    setProfileError(null);
+    setIsSavingProfile(true);
+
+    try {
+      // Upload profile pic first if a new one was selected
+      if (profilePicFile) {
+        const formData = new FormData();
+        formData.append("file", profilePicFile);
+        const picRes = await api.post<{ profile_pic_url: string }>(
+          "/users/me/profile-pic",
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } },
+        );
+        setCurrentProfilePicUrl(picRes.data.profile_pic_url);
+        setSidebarProfilePicUrl(picRes.data.profile_pic_url);
+        setProfilePicPreview(null);
+        setProfilePicFile(null);
+      }
+
+      // Update name / email / password
+      const body: Record<string, unknown> = {
+        name: profileName.trim(),
+        email: profileEmail.trim(),
+      };
+      if (isAdmin && profileRoleCode) {
+        const selectedRole = roles.find((r) => r.code === profileRoleCode);
+        if (selectedRole) body.userTypeId = selectedRole.id;
+      }
+      if (profilePassword.length >= 6) {
+        body.password = profilePassword;
+      }
+
+      await api.patch(`/users/${user.uuid}`, body);
+
+      setUpdateProfileOpen(false);
+      toast.success("Profile updated successfully.");
+    } catch (error) {
+      const msg = extractErrorMessage(error, "Failed to update profile");
+      setProfileError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
   async function handleCreateUser() {
     setSubmitError(null);
     setIsSubmitting(true);
@@ -400,8 +531,11 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
               collapsed ? "justify-center px-0 py-3" : "gap-3 px-3 py-2.5"
             }`}
           >
-            <div className="w-9 h-9 shrink-0 rounded-full bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[11px] font-semibold text-white shadow-md shadow-blue-500/20">
-              {initials}
+            <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[11px] font-semibold text-white shadow-md shadow-blue-500/20">
+              {sidebarProfilePicUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={sidebarProfilePicUrl} alt={user?.name ?? "avatar"} className="w-full h-full object-cover" />
+              ) : initials}
             </div>
             {!collapsed && (
               <>
@@ -436,8 +570,11 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
           >
             {/* User header */}
             <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-200 dark:border-white/7">
-              <div className="w-9 h-9 shrink-0 rounded-full bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[11px] font-semibold text-white">
-                {initials}
+              <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[11px] font-semibold text-white">
+                {sidebarProfilePicUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={sidebarProfilePicUrl} alt={user?.name ?? "avatar"} className="w-full h-full object-cover" />
+                ) : initials}
               </div>
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-100 truncate">
@@ -449,32 +586,45 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
               </div>
             </div>
 
-            {/* Menu items — admin only */}
-            {isAdmin && (
-              <>
-                <div className="p-1.5">
+            {/* Menu items */}
+            <div className="p-1.5">
+              {isAdmin && (
+                <DropdownMenu.Item
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setCreateUserOpen(true);
+                  }}
+                  className={itemClass}
+                >
+                  <UserPlus className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                  Create User
+                </DropdownMenu.Item>
+              )}
+
+              {/* Visible to all users */}
+              <DropdownMenu.Item
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setUpdateProfileOpen(true);
+                }}
+                className={itemClass}
+              >
+                <UserCircle className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                Update Profile
+              </DropdownMenu.Item>
+
+              {isAdmin && (
+                <>
                   <DropdownMenu.Item
                     onSelect={(e) => {
                       e.preventDefault();
-                      setCreateUserOpen(true);
+                      setManageUsersOpen(true);
                     }}
                     className={itemClass}
                   >
-                    <UserPlus className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                    Create User
+                    <Users className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                    Manage Users
                   </DropdownMenu.Item>
-                  {isAdmin && (
-                    <DropdownMenu.Item
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        setManageUsersOpen(true);
-                      }}
-                      className={itemClass}
-                    >
-                      <Users className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                      Manage Users
-                    </DropdownMenu.Item>
-                  )}
                   <DropdownMenu.Item
                     onSelect={(e) => {
                       e.preventDefault();
@@ -485,11 +635,11 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
                     <Settings className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                     Settings
                   </DropdownMenu.Item>
-                </div>
+                </>
+              )}
+            </div>
 
-                <DropdownMenu.Separator className="h-px bg-slate-200 dark:bg-white/7 mx-2" />
-              </>
-            )}
+            <DropdownMenu.Separator className="h-px bg-slate-200 dark:bg-white/7 mx-2" />
 
             {/* Logout */}
             <div className="p-1.5">
@@ -1140,6 +1290,185 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
                     : "Activate"}
               </button>
             </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* ── Update Profile dialog ── */}
+      <Dialog.Root
+        open={updateProfileOpen}
+        onOpenChange={(open) => {
+          setUpdateProfileOpen(open);
+          if (!open) {
+            setProfilePicFile(null);
+            setProfilePicPreview(null);
+            setProfilePassword("");
+            setProfileError(null);
+          }
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#0e1c32] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
+
+            {/* Header */}
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-white">
+                  Update Profile
+                </Dialog.Title>
+                <Dialog.Description className="text-[13px] text-slate-500 dark:text-slate-400">
+                  Update your personal details and profile picture.
+                </Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
+                <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 dark:border-white/8 dark:bg-white/4 dark:text-slate-400 dark:hover:bg-white/8">
+                  <X className="h-4 w-4" />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            {isLoadingProfile ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Profile picture upload */}
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative group">
+                    <div className="w-20 h-20 rounded-full overflow-hidden ring-4 ring-slate-100 dark:ring-white/8 shadow-lg">
+                      {profilePicPreview ?? currentProfilePicUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={profilePicPreview ?? currentProfilePicUrl ?? ""}
+                          alt="Profile"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-xl font-semibold text-white">
+                          {initials}
+                        </div>
+                      )}
+                    </div>
+                    {/* Camera overlay */}
+                    <button
+                      type="button"
+                      onClick={() => profilePicInputRef.current?.click()}
+                      className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Change profile picture"
+                    >
+                      <Camera className="h-5 w-5 text-white" />
+                    </button>
+                  </div>
+                  <input
+                    ref={profilePicInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    className="hidden"
+                    onChange={handleProfilePicChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => profilePicInputRef.current?.click()}
+                    className="text-[12px] font-medium text-blue-500 dark:text-blue-400 hover:underline"
+                  >
+                    {profilePicPreview ? "Change photo" : currentProfilePicUrl ? "Replace photo" : "Upload photo"}
+                  </button>
+                  {profilePicFile && (
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {profilePicFile.name} · {(profilePicFile.size / 1024).toFixed(0)} KB
+                    </p>
+                  )}
+                </div>
+
+                {/* Divider */}
+                <div className="h-px bg-slate-100 dark:bg-white/6" />
+
+                {/* Name */}
+                <div>
+                  <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+                    Full name
+                  </label>
+                  <input
+                    type="text"
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={profileEmail}
+                    onChange={(e) => setProfileEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
+                  />
+                </div>
+
+                {/* Role — visible to admins only */}
+                {isAdmin && (
+                  <div>
+                    <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+                      User Role
+                    </label>
+                    <select
+                      value={profileRoleCode}
+                      onChange={(e) => setProfileRoleCode(e.target.value)}
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
+                    >
+                      <option value="MEMBER">Member</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Password */}
+                <div>
+                  <PasswordStrengthField
+                    label="New password (optional)"
+                    placeholder="Leave blank to keep current password"
+                    value={profilePassword}
+                    onChange={setProfilePassword}
+                  />
+                </div>
+
+                {profileError && (
+                  <p className="text-[12px] text-rose-500">{profileError}</p>
+                )}
+              </div>
+            )}
+
+            {!isLoadingProfile && (
+              <div className="mt-6 flex items-center gap-3">
+                <Dialog.Close asChild>
+                  <button className="flex-1 h-10 rounded-xl border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:border-white/9 dark:bg-white/4 dark:text-slate-300 dark:hover:bg-white/8">
+                    Cancel
+                  </button>
+                </Dialog.Close>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveProfile()}
+                  disabled={
+                    isSavingProfile ||
+                    profileName.trim().length < 2 ||
+                    profileEmail.trim().length === 0 ||
+                    (profilePassword.length > 0 && profilePassword.length < 6)
+                  }
+                  className="flex-1 h-10 rounded-xl bg-blue-500 text-sm font-medium text-white transition-colors hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSavingProfile && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {isSavingProfile ? "Saving..." : "Save changes"}
+                </button>
+              </div>
+            )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

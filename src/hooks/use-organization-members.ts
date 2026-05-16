@@ -8,6 +8,7 @@ export type Member = {
   email: string
   isActive: boolean
   organizationId: number
+  profile_pic_url?: string | null
 }
 
 type MembersResponse = {
