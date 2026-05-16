@@ -455,16 +455,26 @@ function normalizeUrl(url: string) {
 function renderTextWithLinks(text: string, keyPrefix: string, isOwn: boolean) {
   const parts = text.split(URL_REGEX);
 
-  return parts.map((part, index) => {
-    if (!part) return null;
+  return parts.flatMap((part, index) => {
+    if (!part) return [];
 
     if (!URL_REGEX.test(part)) {
-      return <span key={`${keyPrefix}-text-${index}`}>{part}</span>;
+      URL_REGEX.lastIndex = 0;
+      const lines = part.split("\n");
+      return lines.flatMap((line, lineIndex) => {
+        const nodes: React.ReactNode[] = [
+          <span key={`${keyPrefix}-text-${index}-${lineIndex}`}>{line}</span>,
+        ];
+        if (lineIndex < lines.length - 1) {
+          nodes.push(<br key={`${keyPrefix}-br-${index}-${lineIndex}`} />);
+        }
+        return nodes;
+      });
     }
 
     URL_REGEX.lastIndex = 0;
 
-    return (
+    return [
       <a
         key={`${keyPrefix}-link-${index}`}
         href={normalizeUrl(part)}
@@ -477,8 +487,8 @@ function renderTextWithLinks(text: string, keyPrefix: string, isOwn: boolean) {
         }`}
       >
         {part}
-      </a>
-    );
+      </a>,
+    ];
   });
 }
 
@@ -1085,6 +1095,13 @@ export function ChatWindow({
       block: "nearest",
     });
   }, [activeMention, activeMentionIndex]);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+  }, [message]);
 
   function syncMentionState(nextValue: string, caretIndex: number | null) {
     if (!isGroup || caretIndex === null) {
@@ -1724,7 +1741,7 @@ export function ChatWindow({
                     return;
                   }
 
-                  if (e.key === "Enter" || e.key === "Tab") {
+                  if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
                     e.preventDefault();
                     insertMention(
                       filteredMentionMembers[activeMentionIndex] ??
@@ -1745,8 +1762,8 @@ export function ChatWindow({
                   onSendMessage();
                 }
               }}
-              rows={3}
-              className="w-full bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none resize-none px-4 pt-3.5 pb-1"
+              style={{ minHeight: "72px", maxHeight: "200px" }}
+              className="w-full bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none resize-none overflow-y-auto px-4 pt-3.5 pb-1"
             />
 
             <div className="flex items-center justify-between px-3 pb-3 pt-1">
