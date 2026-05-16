@@ -1582,11 +1582,20 @@ export function ChatWindow({
               {showTypingBubble ? (
                 <div className="w-full max-w-sm">
                   <div className="mb-3 flex items-center justify-center gap-3">
-                    <div
-                      className={`h-11 w-11 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-sm font-semibold text-white shadow-lg shadow-slate-200/60 dark:shadow-none`}
-                    >
-                      {selected.initials}
-                    </div>
+                    {!isGroup && selected.profile_pic_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={selected.profile_pic_url}
+                        alt={selected.name}
+                        className="h-11 w-11 rounded-full object-cover shadow-lg shadow-slate-200/60 dark:shadow-none"
+                      />
+                    ) : (
+                      <div
+                        className={`h-11 w-11 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-sm font-semibold text-white shadow-lg shadow-slate-200/60 dark:shadow-none`}
+                      >
+                        {selected.initials}
+                      </div>
+                    )}
                     <div className="text-left">
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                         {typingActorLabel}
@@ -1605,11 +1614,20 @@ export function ChatWindow({
                 </div>
               ) : (
                 <div className="text-center space-y-2">
-                  <div
-                    className={`w-12 h-12 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-sm font-semibold text-white mx-auto`}
-                  >
-                    {selected.initials}
-                  </div>
+                  {!isGroup && selected.profile_pic_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={selected.profile_pic_url}
+                      alt={selected.name}
+                      className="w-12 h-12 rounded-full object-cover mx-auto"
+                    />
+                  ) : (
+                    <div
+                      className={`w-12 h-12 rounded-full bg-linear-to-br ${selected.gradient} flex items-center justify-center text-sm font-semibold text-white mx-auto`}
+                    >
+                      {selected.initials}
+                    </div>
+                  )}
                   <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     {selected.name}
                   </p>
@@ -1649,9 +1667,18 @@ export function ChatWindow({
                           : "hover:bg-slate-50 dark:hover:bg-white/5"
                       }`}
                     >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-cyan-500 text-[10px] font-semibold text-white">
-                        {participant.initials}
-                      </div>
+                      {participant.profile_pic_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={participant.profile_pic_url}
+                          alt={participant.name}
+                          className="h-8 w-8 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-cyan-500 text-[10px] font-semibold text-white">
+                          {participant.initials}
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <p className="truncate text-[12px] font-medium text-slate-800 dark:text-slate-100">
                           {participant.name}

@@ -183,6 +183,7 @@ function memberToConversation(
     online: false,
     isTyping: false,
     gradient: GRADIENTS[member.id % GRADIENTS.length],
+    profile_pic_url: member.profile_pic_url ?? null,
   } satisfies ChatConversation;
 }
 
