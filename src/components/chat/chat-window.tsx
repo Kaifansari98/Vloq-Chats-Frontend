@@ -462,7 +462,7 @@ function renderTextWithLinks(text: string, keyPrefix: string, isOwn: boolean) {
       URL_REGEX.lastIndex = 0;
       const lines = part.split("\n");
       return lines.flatMap((line, lineIndex) => {
-        const nodes: React.ReactNode[] = [
+        const nodes: React.ReactElement[] = [
           <span key={`${keyPrefix}-text-${index}-${lineIndex}`}>{line}</span>,
         ];
         if (lineIndex < lines.length - 1) {
