@@ -175,7 +175,7 @@ export function ChatSidebar({
               transition={{ duration: 0.18, ease: "easeOut" }}
               className="px-5 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-700"
             >
-              Direct Messages
+              Messages
             </motion.p>
           )}
         </AnimatePresence>
