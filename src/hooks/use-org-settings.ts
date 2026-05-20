@@ -85,3 +85,15 @@ export function useRemoveAllowedIp() {
     },
   })
 }
+
+export function useDeleteAllAllowedIps() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      await api.delete("/organization/ip-restrictions")
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["org-ip-restrictions"] })
+    },
+  })
+}

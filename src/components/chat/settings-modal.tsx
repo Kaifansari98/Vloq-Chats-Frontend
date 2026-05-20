@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Dialog } from "radix-ui"
-import { AlertTriangle, Plus, Shield, Trash2, X } from "lucide-react"
+import { useState } from "react";
+import { Dialog } from "radix-ui";
+import { AlertTriangle, Plus, Shield, Trash2, X } from "lucide-react";
 import {
   useMyIp,
   useOrgSettings,
@@ -10,88 +10,100 @@ import {
   useAllowedIps,
   useAddAllowedIp,
   useRemoveAllowedIp,
-} from "@/hooks/use-org-settings"
+  useDeleteAllAllowedIps,
+} from "@/hooks/use-org-settings";
 
 type SettingsModalProps = {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
 
 const OVERLAY =
   "fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm " +
   "data-[state=open]:animate-in data-[state=open]:fade-in-0 " +
-  "data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+  "data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
 
 const CONTENT =
   "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 " +
   "rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-black/10 " +
   "dark:border-white/9 dark:bg-[#0e1c32] dark:shadow-black/60 " +
   "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 " +
-  "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+  "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95";
 
 function isValidIp(ip: string) {
-  const v4 = /^(\d{1,3}\.){3}\d{1,3}$/
-  const v6 = /^[0-9a-fA-F:]+$/
-  return v4.test(ip) || (v6.test(ip) && ip.includes(":"))
+  const v4 = /^(\d{1,3}\.){3}\d{1,3}$/;
+  const v6 = /^[0-9a-fA-F:]+$/;
+  return v4.test(ip) || (v6.test(ip) && ip.includes(":"));
 }
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [newIp, setNewIp] = useState("")
-  const [newLabel, setNewLabel] = useState("")
-  const [ipError, setIpError] = useState<string | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmDeleteAllOpen, setConfirmDeleteAllOpen] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newIp, setNewIp] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+  const [ipError, setIpError] = useState<string | null>(null);
 
-  const { data: settingsData, isLoading: isLoadingSettings } = useOrgSettings()
-  const isEnabled = settingsData?.data?.isIpRestrictionEnabled ?? false
+  const { data: settingsData, isLoading: isLoadingSettings } = useOrgSettings();
+  const isEnabled = settingsData?.data?.isIpRestrictionEnabled ?? false;
 
-  const { data: ipData, isLoading: isLoadingIps } = useAllowedIps(open && isEnabled)
-  const { data: myIpData } = useMyIp(open && isEnabled)
-  const allowedIps = ipData?.data ?? []
+  const { data: ipData, isLoading: isLoadingIps } = useAllowedIps(
+    open && isEnabled,
+  );
+  const { data: myIpData } = useMyIp(open && isEnabled);
+  const allowedIps = ipData?.data ?? [];
 
-  const updateRestriction = useUpdateIpRestriction()
-  const addIp = useAddAllowedIp()
-  const removeIp = useRemoveAllowedIp()
+  const updateRestriction = useUpdateIpRestriction();
+  const addIp = useAddAllowedIp();
+  const removeIp = useRemoveAllowedIp();
+  const deleteAllIps = useDeleteAllAllowedIps();
 
   function handleToggle() {
     if (!isEnabled) {
-      setConfirmOpen(true)
+      setConfirmOpen(true);
     } else {
-      updateRestriction.mutate(false)
+      updateRestriction.mutate(false);
     }
   }
 
   function handleConfirmEnable() {
     updateRestriction.mutate(true, {
       onSuccess: () => setConfirmOpen(false),
-    })
+    });
   }
 
   function handleAddIp() {
-    setIpError(null)
-    const ip = newIp.trim()
-    if (!ip) { setIpError("IP address is required"); return }
-    if (!isValidIp(ip)) { setIpError("Enter a valid IPv4 or IPv6 address"); return }
+    setIpError(null);
+    const ip = newIp.trim();
+    if (!ip) {
+      setIpError("IP address is required");
+      return;
+    }
+    if (!isValidIp(ip)) {
+      setIpError("Enter a valid IPv4 or IPv6 address");
+      return;
+    }
 
     addIp.mutate(
       { ipAddress: ip, label: newLabel.trim() || undefined },
       {
         onSuccess: () => {
-          setNewIp("")
-          setNewLabel("")
-          setShowAddForm(false)
-          setIpError(null)
+          setNewIp("");
+          setNewLabel("");
+          setShowAddForm(false);
+          setIpError(null);
         },
-        onError: () => setIpError("This IP may already be added, or the request failed"),
+        onError: () =>
+          setIpError("This IP may already be added, or the request failed"),
       },
-    )
+    );
   }
 
   function handleCancelAdd() {
-    setShowAddForm(false)
-    setNewIp("")
-    setNewLabel("")
-    setIpError(null)
+    setShowAddForm(false);
+    setNewIp("");
+    setNewLabel("");
+    setIpError(null);
   }
 
   return (
@@ -100,7 +112,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         <Dialog.Portal>
           <Dialog.Overlay className={OVERLAY} />
           <Dialog.Content className={CONTENT}>
-
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-white/8">
               <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-white">
@@ -112,11 +123,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 </button>
               </Dialog.Close>
             </div>
-            <Dialog.Description className="sr-only">Organization settings</Dialog.Description>
+            <Dialog.Description className="sr-only">
+              Organization settings
+            </Dialog.Description>
 
             {/* Body */}
             <div className="max-h-[70vh] overflow-y-auto px-6 py-5 space-y-6">
-
               {/* Security section */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
@@ -127,7 +139,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 dark:border-white/8 overflow-hidden">
-
                   {/* IP restriction row */}
                   <div className="flex items-start justify-between gap-4 px-4 py-4">
                     <div className="min-w-0">
@@ -145,7 +156,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                       type="button"
                       role="switch"
                       aria-checked={isEnabled}
-                      disabled={isLoadingSettings || updateRestriction.isPending}
+                      disabled={
+                        isLoadingSettings || updateRestriction.isPending
+                      }
                       onClick={handleToggle}
                       className={`relative mt-0.5 shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                         isEnabled
@@ -164,44 +177,64 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   {/* Allowed IPs section — only when restriction is enabled */}
                   {isEnabled && (
                     <div className="border-t border-slate-200 dark:border-white/8 px-4 py-4 space-y-3">
-
-                      <p className="text-[12px] font-semibold text-slate-700 dark:text-slate-300">
-                        Allowed IP Addresses
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[12px] font-semibold text-slate-700 dark:text-slate-300">
+                          Allowed IP Addresses
+                          {allowedIps.length > 0 && (
+                            <span className="ml-1.5 font-normal text-slate-400 dark:text-slate-500">
+                              ({allowedIps.length})
+                            </span>
+                          )}
+                        </p>
                         {allowedIps.length > 0 && (
-                          <span className="ml-1.5 font-normal text-slate-400 dark:text-slate-500">
-                            ({allowedIps.length})
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteAllOpen(true)}
+                            className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-slate-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete All
+                          </button>
                         )}
-                      </p>
+                      </div>
 
                       {/* No IPs warning */}
-                      {!isLoadingIps && allowedIps.length === 0 && !showAddForm && (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 dark:border-amber-500/20 dark:bg-amber-500/10">
-                          <div className="flex items-start gap-3">
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400" />
-                            <p className="text-[12px] leading-relaxed text-amber-700 dark:text-amber-300">
-                              No allowed IPs added yet. All users can still
-                              access the system. Add an IP address to start
-                              restricting access.
-                            </p>
-                          </div>
-                          {myIpData?.ip && (
-                            <div className="mt-2.5 flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white/60 px-3 py-2 dark:border-amber-500/20 dark:bg-white/4">
-                              <div className="min-w-0">
-                                <p className="text-[11px] text-amber-600 dark:text-amber-400/70">Your current IP (as seen by the server)</p>
-                                <p className="font-mono text-[12px] font-medium text-slate-700 dark:text-slate-200">{myIpData.ip}</p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => { setNewIp(myIpData.ip); setShowAddForm(true) }}
-                                className="shrink-0 rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-200 dark:border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30"
-                              >
-                                Add this IP
-                              </button>
+                      {!isLoadingIps &&
+                        allowedIps.length === 0 &&
+                        !showAddForm && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+                            <div className="flex items-start gap-3">
+                              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400" />
+                              <p className="text-[12px] leading-relaxed text-amber-700 dark:text-amber-300">
+                                No allowed IPs added yet. All users can still
+                                access the system. Add an IP address to start
+                                restricting access.
+                              </p>
                             </div>
-                          )}
-                        </div>
-                      )}
+                            {myIpData?.ip && (
+                              <div className="mt-2.5 flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white/60 px-3 py-2 dark:border-amber-500/20 dark:bg-white/4">
+                                <div className="min-w-0">
+                                  <p className="text-[11px] text-amber-600 dark:text-amber-400/70">
+                                    Your current IP (as seen by the server)
+                                  </p>
+                                  <p className="font-mono text-[12px] font-medium text-slate-700 dark:text-slate-200">
+                                    {myIpData.ip}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewIp(myIpData.ip);
+                                    setShowAddForm(true);
+                                  }}
+                                  className="shrink-0 rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-200 dark:border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30"
+                                >
+                                  Add this IP
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                       {/* Add IP form */}
                       {showAddForm ? (
@@ -209,12 +242,19 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                           {myIpData?.ip && (
                             <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/8 dark:bg-white/4">
                               <div className="min-w-0">
-                                <p className="text-[11px] text-slate-400 dark:text-slate-500">Your current IP (as seen by the server)</p>
-                                <p className="font-mono text-[12px] font-medium text-slate-700 dark:text-slate-200">{myIpData.ip}</p>
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                                  Your current IP (as seen by the server)
+                                </p>
+                                <p className="font-mono text-[12px] font-medium text-slate-700 dark:text-slate-200">
+                                  {myIpData.ip}
+                                </p>
                               </div>
                               <button
                                 type="button"
-                                onClick={() => { setNewIp(myIpData.ip); setIpError(null) }}
+                                onClick={() => {
+                                  setNewIp(myIpData.ip);
+                                  setIpError(null);
+                                }}
                                 className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20"
                               >
                                 Use this IP
@@ -224,7 +264,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                           <input
                             type="text"
                             value={newIp}
-                            onChange={(e) => { setNewIp(e.target.value); setIpError(null) }}
+                            onChange={(e) => {
+                              setNewIp(e.target.value);
+                              setIpError(null);
+                            }}
                             placeholder="IP address — e.g. 192.168.1.1"
                             autoFocus
                             className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 font-mono text-[13px] text-slate-800 outline-none transition-colors placeholder:font-sans focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
@@ -237,7 +280,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                             className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
                           />
                           {ipError && (
-                            <p className="text-[12px] text-rose-500">{ipError}</p>
+                            <p className="text-[12px] text-rose-500">
+                              {ipError}
+                            </p>
                           )}
                           <div className="flex items-center gap-2 pt-0.5">
                             <button
@@ -316,7 +361,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
       <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className={OVERLAY.replace("z-50", "z-60")} />
-          <Dialog.Content className={CONTENT.replace("z-50", "z-60").replace("max-w-lg", "max-w-sm") + " p-6"}>
+          <Dialog.Content
+            className={
+              CONTENT.replace("z-50", "z-60").replace("max-w-lg", "max-w-sm") +
+              " p-6"
+            }
+          >
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10">
               <Shield className="h-5 w-5 text-amber-500 dark:text-amber-400" />
             </div>
@@ -348,6 +398,55 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      {/* Confirmation dialog — delete all IPs */}
+      <Dialog.Root
+        open={confirmDeleteAllOpen}
+        onOpenChange={setConfirmDeleteAllOpen}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className={OVERLAY.replace("z-50", "z-60")} />
+          <Dialog.Content
+            className={
+              CONTENT.replace("z-50", "z-60").replace("max-w-lg", "max-w-sm") +
+              " p-6"
+            }
+          >
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/10">
+              <Trash2 className="h-5 w-5 text-red-500 dark:text-red-400" />
+            </div>
+
+            <Dialog.Title className="mb-1.5 text-base font-semibold text-slate-900 dark:text-white">
+              Delete All IP Addresses?
+            </Dialog.Title>
+            <Dialog.Description className="mb-6 text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+              This will remove all {allowedIps.length} allowed IP
+              {allowedIps.length !== 1 ? "s" : ""}. All users will be able to
+              access the system from any IP until you add new ones.
+            </Dialog.Description>
+
+            <div className="flex items-center gap-3">
+              <Dialog.Close asChild>
+                <button className="h-9 flex-1 rounded-xl border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:border-white/9 dark:bg-white/4 dark:text-slate-300 dark:hover:bg-white/8">
+                  Cancel
+                </button>
+              </Dialog.Close>
+              <button
+                type="button"
+                disabled={deleteAllIps.isPending}
+                onClick={() =>
+                  deleteAllIps.mutate(undefined, {
+                    onSuccess: () => setConfirmDeleteAllOpen(false),
+                  })
+                }
+                className="h-9 flex-1 rounded-xl bg-red-500 text-sm font-medium text-white shadow-lg shadow-red-500/20 transition-colors hover:bg-red-400 disabled:opacity-50"
+              >
+                {deleteAllIps.isPending ? "Deleting..." : "Delete All"}
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
-  )
+  );
 }
