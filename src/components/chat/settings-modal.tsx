@@ -203,42 +203,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         </div>
                       )}
 
-                      {/* IP list */}
-                      {isLoadingIps ? (
-                        <p className="text-[12px] text-slate-400 dark:text-slate-500">
-                          Loading...
-                        </p>
-                      ) : allowedIps.length > 0 ? (
-                        <div className="space-y-1.5">
-                          {allowedIps.map((ip) => (
-                            <div
-                              key={ip.uuid}
-                              className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/8 dark:bg-white/4"
-                            >
-                              <div className="min-w-0">
-                                <p className="font-mono text-[13px] font-medium text-slate-800 dark:text-slate-100">
-                                  {ip.ipAddress}
-                                </p>
-                                {ip.label && (
-                                  <p className="mt-0.5 truncate text-[11px] text-slate-400 dark:text-slate-500">
-                                    {ip.label}
-                                  </p>
-                                )}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => removeIp.mutate(ip.uuid)}
-                                disabled={removeIp.isPending}
-                                aria-label={`Remove ${ip.ipAddress}`}
-                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-
                       {/* Add IP form */}
                       {showAddForm ? (
                         <div className="space-y-2">
@@ -303,6 +267,42 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                           Add IP Address
                         </button>
                       )}
+
+                      {/* IP list */}
+                      {isLoadingIps ? (
+                        <p className="text-[12px] text-slate-400 dark:text-slate-500">
+                          Loading...
+                        </p>
+                      ) : allowedIps.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {allowedIps.map((ip) => (
+                            <div
+                              key={ip.uuid}
+                              className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/8 dark:bg-white/4"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-mono text-[13px] font-medium text-slate-800 dark:text-slate-100">
+                                  {ip.ipAddress}
+                                </p>
+                                {ip.label && (
+                                  <p className="mt-0.5 truncate text-[11px] text-slate-400 dark:text-slate-500">
+                                    {ip.label}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeIp.mutate(ip.uuid)}
+                                disabled={removeIp.isPending}
+                                aria-label={`Remove ${ip.ipAddress}`}
+                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </div>
