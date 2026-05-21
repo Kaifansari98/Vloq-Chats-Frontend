@@ -31,13 +31,15 @@ export function useSendGroupMessage(conversationUuid?: string) {
     mutationFn: async ({
       content,
       mentions,
+      replyToMessageUuid,
     }: {
       content: string
       mentions?: Array<{ mentionedUserId: number; offset: number; length: number }>
+      replyToMessageUuid?: string
     }) => {
       const { data } = await api.post<SendGroupMessageResponse>(
         `/chats/group/${conversationUuid}/messages`,
-        { content, mentions },
+        { content, mentions, ...(replyToMessageUuid && { replyToMessageUuid }) },
       )
       return data
     },
@@ -56,11 +58,13 @@ export function useUploadGroupMessage(conversationUuid?: string) {
       content,
       files,
       mentions,
+      replyToMessageUuid,
       onUploadProgress,
     }: {
       content: string
       files: File[]
       mentions?: Array<{ mentionedUserId: number; offset: number; length: number }>
+      replyToMessageUuid?: string
       onUploadProgress?: (pct: number) => void
     }) => {
       const formData = new FormData()
@@ -68,6 +72,7 @@ export function useUploadGroupMessage(conversationUuid?: string) {
       if (mentions && mentions.length > 0) {
         formData.append("mentions", JSON.stringify(mentions))
       }
+      if (replyToMessageUuid) formData.append("replyToMessageUuid", replyToMessageUuid)
       for (const file of files) formData.append("files", file)
 
       const { data } = await api.post<SendGroupMessageResponse>(

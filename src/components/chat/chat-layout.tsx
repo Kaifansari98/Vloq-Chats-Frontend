@@ -268,6 +268,7 @@ export function ChatLayout() {
   );
   const [message, setMessage] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
   const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -674,6 +675,7 @@ export function ChatLayout() {
 
   function selectConversation(id: string) {
     setSelectedFiles([]);
+    setReplyToMessage(null);
     setSelectedId(id);
     localStorage.setItem("vloq:selectedChatId", id);
   }
@@ -813,8 +815,10 @@ export function ChatLayout() {
     stopTyping();
 
     const filesToUpload = [...selectedFiles];
+    const replyToMessageUuid = replyToMessage?.uuid;
     setMessage("");
     setSelectedFiles([]);
+    setReplyToMessage(null);
 
     if (filesToUpload.length === 0) {
       if (isGroup) {
@@ -822,10 +826,10 @@ export function ChatLayout() {
           content,
           "participants" in selected ? (selected.participants ?? []) : [],
         );
-        await sendGroupMessage.mutateAsync({ content, mentions });
+        await sendGroupMessage.mutateAsync({ content, mentions, replyToMessageUuid });
       } else {
         if (!selected.memberId) return;
-        await sendDirectMessage.mutateAsync(content);
+        await sendDirectMessage.mutateAsync({ content, replyToMessageUuid });
       }
       return;
     }
@@ -879,6 +883,7 @@ export function ChatLayout() {
           content,
           files: filesToUpload,
           mentions,
+          replyToMessageUuid,
           onUploadProgress: updateProgress,
         });
       } else {
@@ -886,6 +891,7 @@ export function ChatLayout() {
         await uploadDirectMessage.mutateAsync({
           content,
           files: filesToUpload,
+          replyToMessageUuid,
           onUploadProgress: updateProgress,
         });
       }
@@ -930,6 +936,7 @@ export function ChatLayout() {
               status: item.status,
               readAt: item.readAt,
               attachments: item.attachments,
+              replyTo: item.replyTo,
             })),
             ...pendingMessages,
           ]}
@@ -955,6 +962,7 @@ export function ChatLayout() {
                   .map((entry) => entry.userName.split(" ")[0])
               : []
           }
+          replyToMessage={replyToMessage}
           onMessageChange={handleMessageChange}
           onSendMessage={sendMessage}
           onSendVoiceMessage={sendVoiceMessage}
@@ -962,6 +970,8 @@ export function ChatLayout() {
           onRemoveFile={(index) =>
             setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
           }
+          onReply={setReplyToMessage}
+          onCancelReply={() => setReplyToMessage(null)}
         />
       ) : (
         <main className="flex-1 flex flex-col min-w-0">

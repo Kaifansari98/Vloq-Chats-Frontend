@@ -24,6 +24,12 @@ export type DirectMessage = {
   status: "sent" | "read"
   readAt?: string | null
   attachments: MessageAttachment[]
+  replyTo?: {
+    uuid: string
+    senderName: string
+    content: string | null
+    attachmentType: string | null
+  } | null
 }
 
 type DirectMessagesResponse = {
@@ -52,10 +58,11 @@ export function useSendDirectMessage(participantUserId?: number) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({ content, replyToMessageUuid }: { content: string; replyToMessageUuid?: string }) => {
       const { data } = await api.post<SendDirectMessageResponse>("/chats/direct/messages", {
         participantUserId,
         content,
+        ...(replyToMessageUuid && { replyToMessageUuid }),
       })
       return data
     },
@@ -73,15 +80,18 @@ export function useUploadDirectMessage(participantUserId?: number) {
     mutationFn: async ({
       content,
       files,
+      replyToMessageUuid,
       onUploadProgress,
     }: {
       content: string
       files: File[]
+      replyToMessageUuid?: string
       onUploadProgress?: (pct: number) => void
     }) => {
       const formData = new FormData()
       formData.append("participantUserId", String(participantUserId))
       if (content.trim()) formData.append("content", content.trim())
+      if (replyToMessageUuid) formData.append("replyToMessageUuid", replyToMessageUuid)
       for (const file of files) formData.append("files", file)
 
       const { data } = await api.post<SendDirectMessageResponse>(

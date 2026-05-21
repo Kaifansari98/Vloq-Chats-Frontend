@@ -46,14 +46,30 @@ export function NotificationManager() {
         return;
       }
 
-      const serviceWorkerRegistration = await navigator.serviceWorker.register(
-        "/firebase-messaging-sw.js",
-      );
+      let serviceWorkerRegistration: ServiceWorkerRegistration;
+      try {
+        serviceWorkerRegistration = await navigator.serviceWorker.register(
+          "/firebase-messaging-sw.js",
+        );
+      } catch {
+        // SW registration fails when the push service is unavailable (e.g. offline, browser restriction).
+        return;
+      }
 
-      const currentToken = await getToken(messaging, {
-        vapidKey: FIREBASE_VAPID_KEY,
-        serviceWorkerRegistration,
-      });
+      let currentToken: string;
+      try {
+        currentToken = await getToken(messaging, {
+          vapidKey: FIREBASE_VAPID_KEY,
+          serviceWorkerRegistration,
+        });
+      } catch (err) {
+        // AbortError ("Registration failed - push service not available") is a transient
+        // browser/network condition — not a bug worth surfacing in the console.
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
+        throw err;
+      }
 
       if (!currentToken || isCancelled) {
         return;
