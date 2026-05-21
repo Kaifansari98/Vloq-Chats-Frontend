@@ -3,11 +3,11 @@
 import { useRef, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
-  Download,
   FileArchive,
   FileSpreadsheet,
   FileText,
   Loader2,
+  Mic,
   Pause,
   Play,
   Presentation,
@@ -84,9 +84,15 @@ function generateBars(seed: number): number[] {
 function AudioAttachmentPlayer({
   track,
   isOwn,
+  senderProfilePicUrl,
+  senderInitials,
+  createdAt,
 }: {
   track: MessageAttachment;
   isOwn: boolean;
+  senderProfilePicUrl?: string | null;
+  senderInitials?: string;
+  createdAt?: string;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -103,11 +109,15 @@ function AudioAttachmentPlayer({
   }, [track.name, track.sizeBytes]);
 
   const cardWidth = duration > 0
-    ? Math.min(400, Math.max(260, Math.round(200 + duration * 15)))
-    : 280;
+    ? Math.min(380, Math.max(240, Math.round(180 + duration * 14)))
+    : 260;
 
   const progress = duration > 0 ? currentTime / duration : 0;
   const activeBars = Math.floor(progress * BAR_COUNT);
+
+  const timeLabel = createdAt
+    ? new Date(createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : "";
 
   function togglePlay() {
     const audio = audioRef.current;
@@ -130,21 +140,28 @@ function AudioAttachmentPlayer({
     setHoveredBar(Math.min(BAR_COUNT - 1, Math.floor(ratio * BAR_COUNT)));
   }
 
-  function handleDownload() {
-    const a = document.createElement("a");
-    a.href = track.url;
-    a.download = track.name;
-    a.click();
-  }
+  const avatar = (
+    <div className="relative shrink-0">
+      <div className="h-10 w-10 overflow-hidden rounded-full">
+        {senderProfilePicUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={senderProfilePicUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-slate-600 text-[13px] font-semibold text-white">
+            {senderInitials ?? "?"}
+          </div>
+        )}
+      </div>
+      <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-400 ring-2 ring-slate-800">
+        <Mic className="h-2.5 w-2.5 text-white" />
+      </div>
+    </div>
+  );
 
   return (
     <div
       style={{ width: cardWidth, maxWidth: "calc(75vw - 32px)" }}
-      className={`flex flex-col gap-2 rounded-2xl border px-3.5 py-3 ${
-        isOwn
-          ? "border-white/10 bg-blue-500"
-          : "border-slate-200 bg-white dark:border-white/8 dark:bg-white/6"
-      }`}
+      className="flex items-center gap-2.5 rounded-[22px] bg-slate-800 px-3 py-2.5"
     >
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio
@@ -188,40 +205,40 @@ function AudioAttachmentPlayer({
         onPause={() => setIsPlaying(false)}
       />
 
-      <div className="flex items-center gap-2.5">
-        {/* Play / Pause / Loading */}
-        <button
-          type="button"
-          onClick={togglePlay}
-          disabled={isLoading}
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-60 ${
-            isOwn
-              ? "bg-white/20 text-white hover:bg-white/30"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/16"
-          }`}
-        >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : isPlaying ? (
-            <Pause className="h-4 w-4 fill-current" />
-          ) : (
-            <Play className="h-4 w-4 translate-x-px fill-current" />
-          )}
-        </button>
+      {/* Own: avatar on left */}
+      {isOwn && avatar}
 
+      {/* Play / Pause */}
+      <button
+        type="button"
+        onClick={togglePlay}
+        disabled={isLoading}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition-colors hover:bg-white/25 disabled:opacity-50"
+      >
+        {isLoading ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : isPlaying ? (
+          <Pause className="h-3.5 w-3.5 fill-current" />
+        ) : (
+          <Play className="h-3.5 w-3.5 translate-x-px fill-current" />
+        )}
+      </button>
+
+      {/* Waveform + bottom row */}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         {/* Waveform */}
         <div
-          className="relative flex-1 cursor-pointer select-none"
+          className="relative cursor-pointer select-none"
           onClick={handleSeek}
           onMouseMove={handleWaveformHover}
           onMouseLeave={() => setHoveredBar(null)}
         >
-          <div className="flex h-9 items-end gap-[2px]">
+          <div className="flex h-8 items-end gap-[1.5px]">
             {bars.map((h, i) => {
               const isActive = i < activeBars;
               const isPlayhead = isPlaying && i === activeBars && i < BAR_COUNT;
               const isHoverPreview = hoveredBar !== null && !isActive && i <= hoveredBar;
-              const barHeight = Math.round(Math.max(12, h * 100));
+              const barHeight = Math.round(Math.max(10, h * 100));
 
               if (isPlayhead) {
                 return (
@@ -230,9 +247,7 @@ function AudioAttachmentPlayer({
                     animate={{ scaleY: [1, 1.35, 1] }}
                     transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut" }}
                     style={{ height: `${barHeight}%` }}
-                    className={`flex-1 rounded-full origin-bottom ${
-                      isOwn ? "bg-white" : "bg-blue-500"
-                    }`}
+                    className="flex-1 origin-bottom rounded-full bg-white"
                   />
                 );
               }
@@ -243,52 +258,39 @@ function AudioAttachmentPlayer({
                   style={{ height: `${barHeight}%` }}
                   className={`flex-1 rounded-full transition-colors duration-75 ${
                     isActive
-                      ? isOwn ? "bg-white" : "bg-blue-500"
+                      ? "bg-white"
                       : isHoverPreview
-                        ? isOwn ? "bg-white/55" : "bg-blue-400"
-                        : isOwn ? "bg-white/28" : "bg-slate-300 dark:bg-white/18"
+                        ? "bg-white/50"
+                        : "bg-white/25"
                   }`}
                 />
               );
             })}
           </div>
 
-          {/* Scrubber dot — spring-animated for smooth playback */}
+          {/* Scrubber dot */}
           {duration > 0 && (
             <motion.div
-              className={`pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-md ${
-                isOwn ? "bg-white" : "bg-blue-500"
-              }`}
+              className="pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow"
               animate={{ left: `${progress * 100}%` }}
               transition={{ type: "spring", stiffness: 420, damping: 38, mass: 0.3 }}
             />
           )}
         </div>
 
+        {/* Duration + timestamp */}
+        <div className="flex items-center justify-between px-0.5">
+          <span className="text-[10px] tabular-nums font-medium text-white/55">
+            {formatTime(currentTime || duration)}
+          </span>
+          {timeLabel && (
+            <span className="text-[10px] tabular-nums text-white/40">{timeLabel}</span>
+          )}
+        </div>
       </div>
 
-      {/* Bottom row: current / total + download */}
-      <div className="flex items-center justify-between px-0.5">
-        <span
-          className={`text-[10px] tabular-nums font-medium ${
-            isOwn ? "text-blue-100/75" : "text-slate-400 dark:text-slate-500"
-          }`}
-        >
-          {formatTime(currentTime)} / {formatTime(duration)}
-        </span>
-        <button
-          type="button"
-          onClick={handleDownload}
-          title="Download"
-          className={`transition-colors ${
-            isOwn
-              ? "text-white/55 hover:text-white"
-              : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-          }`}
-        >
-          <Download className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      {/* Received: avatar on right */}
+      {!isOwn && avatar}
     </div>
   );
 }
@@ -301,12 +303,18 @@ export function AttachmentDisplay({
   imageClassName,
   docClassName,
   onPreviewImage,
+  senderProfilePicUrl,
+  senderInitials,
+  createdAt,
 }: {
   attachments: MessageAttachment[];
   isOwn: boolean;
   imageClassName?: string;
   docClassName?: string;
   onPreviewImage?: (attachment: MessageAttachment) => void;
+  senderProfilePicUrl?: string | null;
+  senderInitials?: string;
+  createdAt?: string;
 }) {
   if (attachments.length === 0) return null;
 
@@ -339,7 +347,14 @@ export function AttachmentDisplay({
       )}
 
       {audioFiles.map((track) => (
-        <AudioAttachmentPlayer key={track.uuid} track={track} isOwn={isOwn} />
+        <AudioAttachmentPlayer
+          key={track.uuid}
+          track={track}
+          isOwn={isOwn}
+          senderProfilePicUrl={senderProfilePicUrl}
+          senderInitials={senderInitials}
+          createdAt={createdAt}
+        />
       ))}
 
       {docs.map((doc) => {

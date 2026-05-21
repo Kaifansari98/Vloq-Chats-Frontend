@@ -1476,16 +1476,26 @@ export function ChatWindow({
                           (a) => a.mimeType.startsWith("audio/"),
                         ) && (
                           <div className="relative mb-1.5">
-                            {!chatMessage.isOwnMessage && (
-                              <p className="mb-1.5 px-0.5 text-[12px] font-semibold leading-none text-slate-700 dark:text-slate-200">
-                                {chatMessage.senderName}
-                              </p>
-                            )}
                             <AttachmentDisplay
                               attachments={chatMessage.attachments.filter(
                                 (a) => a.mimeType.startsWith("audio/"),
                               )}
                               isOwn={chatMessage.isOwnMessage}
+                              senderProfilePicUrl={
+                                chatMessage.isOwnMessage
+                                  ? (groupMembers.find((m) => m.name === chatMessage.senderName)?.profile_pic_url ?? null)
+                                  : isGroup
+                                    ? (groupMembers.find((m) => m.name === chatMessage.senderName)?.profile_pic_url ?? null)
+                                    : (selected.profile_pic_url ?? null)
+                              }
+                              senderInitials={
+                                chatMessage.isOwnMessage
+                                  ? (groupMembers.find((m) => m.name === chatMessage.senderName)?.initials ?? chatMessage.senderName.charAt(0).toUpperCase())
+                                  : isGroup
+                                    ? (groupMembers.find((m) => m.name === chatMessage.senderName)?.initials ?? chatMessage.senderName.charAt(0).toUpperCase())
+                                    : selected.initials
+                              }
+                              createdAt={chatMessage.createdAt}
                             />
                             {!chatMessage.isOwnMessage && (
                               <button
