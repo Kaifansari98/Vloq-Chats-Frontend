@@ -1791,27 +1791,37 @@ export function ChatWindow({
           ) : (
           <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/8 rounded-2xl focus-within:border-blue-400/40 dark:focus-within:border-blue-500/25 transition-colors overflow-hidden">
             {replyToMessage && (
-              <div className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-slate-200 dark:border-white/8 bg-blue-50 dark:bg-blue-950/20">
-                <div className="w-0.5 h-8 shrink-0 rounded-full bg-blue-500" />
+              <div className="flex items-center gap-3 px-3.5 py-2.5 border-b border-slate-200 dark:border-white/8">
+                <div className="w-[3px] self-stretch shrink-0 rounded-full bg-blue-500" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-semibold text-blue-500">
-                    Replying to {replyToMessage.senderName}
+                  <p className="text-[11px] font-semibold text-blue-500 dark:text-blue-400 leading-none mb-1">
+                    {replyToMessage.senderName}
                   </p>
-                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                    {replyToMessage.content ?? (
-                      replyToMessage.attachments[0]?.mimeType.startsWith("image/") ? "Image" :
-                      replyToMessage.attachments[0]?.mimeType.startsWith("audio/") ? "Audio" :
-                      replyToMessage.attachments.length > 0 ? "Attachment" : ""
-                    )}
-                  </p>
+                  {replyToMessage.attachments[0]?.mimeType.startsWith("audio/") ? (
+                    <p className="flex items-center gap-1 text-[11px] text-emerald-500 dark:text-emerald-400">
+                      <Mic className="h-3 w-3" /> Voice message
+                    </p>
+                  ) : replyToMessage.attachments[0]?.mimeType.startsWith("image/") ? (
+                    <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      <ImageIcon className="h-3 w-3" /> Image
+                    </p>
+                  ) : replyToMessage.attachments.length > 0 ? (
+                    <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      <FileText className="h-3 w-3" /> File
+                    </p>
+                  ) : (
+                    <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                      {replyToMessage.content}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
                   onClick={onCancelReply}
                   aria-label="Cancel reply"
-                  className="shrink-0 p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                  className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-white/20 transition-colors"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3 w-3" />
                 </button>
               </div>
             )}
