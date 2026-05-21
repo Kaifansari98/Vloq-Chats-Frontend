@@ -1525,7 +1525,7 @@ export function ChatWindow({
                                     </p>
                                   ) : chatMessage.replyTo.attachmentType === "AUDIO" ? (
                                     <p className={`flex items-center gap-1 text-[11px] ${chatMessage.isOwnMessage ? "text-white/65" : "text-slate-500 dark:text-slate-400"}`}>
-                                      <Mic className="h-3 w-3" /> Audio
+                                      <Mic className="h-3 w-3" /> Voice message
                                     </p>
                                   ) : (
                                     <p className={`truncate text-[11px] ${chatMessage.isOwnMessage ? "text-white/65" : "text-slate-500 dark:text-slate-400"}`}>
