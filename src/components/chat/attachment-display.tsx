@@ -147,12 +147,12 @@ function AudioAttachmentPlayer({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={senderProfilePicUrl} alt="" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-slate-600 text-[13px] font-semibold text-white">
+          <div className="flex h-full w-full items-center justify-center bg-slate-400 dark:bg-slate-600 text-[13px] font-semibold text-white">
             {senderInitials ?? "?"}
           </div>
         )}
       </div>
-      <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-400 ring-2 ring-slate-800">
+      <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-400 ring-2 ring-slate-100 dark:ring-slate-800">
         <Mic className="h-2.5 w-2.5 text-white" />
       </div>
     </div>
@@ -161,7 +161,7 @@ function AudioAttachmentPlayer({
   return (
     <div
       style={{ width: cardWidth, maxWidth: "calc(75vw - 32px)" }}
-      className="flex items-center gap-2.5 rounded-[22px] bg-slate-800 px-3 py-2.5"
+      className="flex items-center gap-2.5 rounded-[22px] bg-slate-100 dark:bg-slate-800 px-3 py-2.5"
     >
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio
@@ -213,7 +213,7 @@ function AudioAttachmentPlayer({
         type="button"
         onClick={togglePlay}
         disabled={isLoading}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition-colors hover:bg-white/25 disabled:opacity-50"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-300 text-slate-700 transition-colors hover:bg-slate-400 dark:bg-white/15 dark:text-white dark:hover:bg-white/25 disabled:opacity-50"
       >
         {isLoading ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -247,7 +247,7 @@ function AudioAttachmentPlayer({
                     animate={{ scaleY: [1, 1.35, 1] }}
                     transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut" }}
                     style={{ height: `${barHeight}%` }}
-                    className="flex-1 origin-bottom rounded-full bg-white"
+                    className="flex-1 origin-bottom rounded-full bg-slate-600 dark:bg-white"
                   />
                 );
               }
@@ -258,10 +258,10 @@ function AudioAttachmentPlayer({
                   style={{ height: `${barHeight}%` }}
                   className={`flex-1 rounded-full transition-colors duration-75 ${
                     isActive
-                      ? "bg-white"
+                      ? "bg-slate-600 dark:bg-white"
                       : isHoverPreview
-                        ? "bg-white/50"
-                        : "bg-white/25"
+                        ? "bg-slate-400 dark:bg-white/50"
+                        : "bg-slate-300 dark:bg-white/25"
                   }`}
                 />
               );
@@ -271,7 +271,7 @@ function AudioAttachmentPlayer({
           {/* Scrubber dot */}
           {duration > 0 && (
             <motion.div
-              className="pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow"
+              className="pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-700 dark:bg-white shadow"
               animate={{ left: `${progress * 100}%` }}
               transition={{ type: "spring", stiffness: 420, damping: 38, mass: 0.3 }}
             />
@@ -280,11 +280,11 @@ function AudioAttachmentPlayer({
 
         {/* Duration + timestamp */}
         <div className="flex items-center justify-between px-0.5">
-          <span className="text-[10px] tabular-nums font-medium text-white/55">
+          <span className="text-[10px] tabular-nums font-medium text-slate-500 dark:text-white/55">
             {formatTime(currentTime || duration)}
           </span>
           {timeLabel && (
-            <span className="text-[10px] tabular-nums text-white/40">{timeLabel}</span>
+            <span className="text-[10px] tabular-nums text-slate-400 dark:text-white/40">{timeLabel}</span>
           )}
         </div>
       </div>
