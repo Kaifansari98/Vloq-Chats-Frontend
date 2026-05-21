@@ -947,6 +947,7 @@ export function ChatWindow({
   const mentionListRef = useRef<HTMLDivElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
+  const [highlightedUuid, setHighlightedUuid] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<MessageAttachment | null>(
     null,
   );
@@ -1004,6 +1005,14 @@ export function ChatWindow({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [previewImage]);
+
+  function scrollToMessage(uuid: string) {
+    const el = document.querySelector(`[data-message-uuid="${uuid}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedUuid(uuid);
+    setTimeout(() => setHighlightedUuid(null), 1500);
+  }
 
   function openPreviewImage(attachment: MessageAttachment) {
     setPreviewImage(attachment);
@@ -1404,7 +1413,8 @@ export function ChatWindow({
                     {group.messages.map((chatMessage) => (
                       <div
                         key={chatMessage.uuid}
-                        className={`group/msg flex flex-col ${chatMessage.isOwnMessage ? "items-end" : "items-start"}`}
+                        data-message-uuid={chatMessage.uuid}
+                        className={`group/msg flex flex-col rounded-xl transition-colors duration-75 ${chatMessage.isOwnMessage ? "items-end" : "items-start"} ${highlightedUuid === chatMessage.uuid ? "bg-blue-500/10 dark:bg-blue-400/10" : ""}`}
                       >
                         {chatMessage.attachments.some(
                           (attachment) => attachment.attachmentType === "IMAGE",
@@ -1505,11 +1515,14 @@ export function ChatWindow({
                               </p>
                             )}
                             {chatMessage.replyTo && !chatMessage.isPending && (
-                              <div className={`mb-2 flex gap-2 overflow-hidden rounded-xl px-2.5 py-2 ${
-                                chatMessage.isOwnMessage
-                                  ? "bg-white/15"
-                                  : "bg-slate-100 dark:bg-white/6"
-                              }`}>
+                              <div
+                                onClick={() => scrollToMessage(chatMessage.replyTo!.uuid)}
+                                className={`mb-2 flex gap-2 overflow-hidden rounded-xl px-2.5 py-2 cursor-pointer active:opacity-70 transition-opacity ${
+                                  chatMessage.isOwnMessage
+                                    ? "bg-white/15 hover:bg-white/20"
+                                    : "bg-slate-100 dark:bg-white/6 hover:bg-slate-200 dark:hover:bg-white/10"
+                                }`}
+                              >
                                 <div className={`w-0.5 shrink-0 rounded-full ${chatMessage.isOwnMessage ? "bg-white/60" : "bg-blue-400"}`} />
                                 <div className="min-w-0 flex-1">
                                   <p className={`text-[11px] font-semibold ${chatMessage.isOwnMessage ? "text-white/90" : "text-blue-500 dark:text-blue-400"}`}>
