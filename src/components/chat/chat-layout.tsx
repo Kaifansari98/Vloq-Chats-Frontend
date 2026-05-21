@@ -379,6 +379,21 @@ export function ChatLayout() {
 
     socket.on("notification:new", (notification: NotificationItem) => {
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+
+      if (document.visibilityState !== "visible" && Notification.permission === "granted") {
+        const n = new Notification(notification.title, {
+          body: notification.body ?? undefined,
+          icon: "/favicon.ico",
+        });
+        n.onclick = () => {
+          window.focus();
+          if (notification.conversationUuid) {
+            localStorage.setItem("vloq:selectedChatId", notification.conversationUuid);
+            setSelectedId(notification.conversationUuid);
+          }
+        };
+      }
+
       toast.info(notification.title, {
         description: notification.body,
         duration: 5000,

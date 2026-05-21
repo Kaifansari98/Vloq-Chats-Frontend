@@ -75,7 +75,9 @@ export function NotificationManager() {
       window.localStorage.setItem(FCM_TOKEN_STORAGE_KEY, currentToken);
     }
 
-    void syncPushNotifications();
+    void syncPushNotifications().catch((err) => {
+      console.error("[NotificationManager] push setup failed:", err);
+    });
 
     let unsubscribe: (() => void) | undefined;
 
@@ -85,9 +87,23 @@ export function NotificationManager() {
         return;
       }
 
-      unsubscribe = onMessage(messaging, () => {
-        // Socket events already update the active UI. Foreground push handling
-        // can stay passive until product wants toast UI.
+      unsubscribe = onMessage(messaging, (payload) => {
+        if (document.visibilityState === "visible") return;
+
+        const title = payload.notification?.title ?? "Vloq Chats";
+        const body = payload.notification?.body ?? "You have a new message";
+        const link =
+          (payload.fcmOptions as { link?: string } | undefined)?.link ??
+          (payload.data as { link?: string } | undefined)?.link ??
+          "/";
+
+        if (Notification.permission !== "granted") return;
+
+        const n = new Notification(title, { body, icon: "/favicon.ico" });
+        n.onclick = () => {
+          window.focus();
+          window.location.href = link;
+        };
       });
     })();
 
