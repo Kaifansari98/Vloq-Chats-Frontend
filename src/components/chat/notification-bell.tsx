@@ -139,36 +139,36 @@ export function NotificationBell({
                   key={notification.uuid}
                   type="button"
                   onClick={() => void openNotification(notification)}
-                  className={`flex w-full items-start gap-4 border-b border-slate-200 px-5 py-4 text-left transition-colors last:border-b-0 hover:bg-slate-50 dark:border-white/8 dark:hover:bg-white/6 ${
+                  className={`flex w-full items-center gap-3 border-b border-slate-200 px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-slate-50 dark:border-white/8 dark:hover:bg-white/6 ${
                     notification.isRead ? "opacity-75" : ""
                   }`}
                 >
-                  <div className="relative h-11 w-11 shrink-0 rounded-full">
+                  <div className="relative h-8 w-8 shrink-0 rounded-full">
                     {notification.senderProfilePicUrl ? (
                       <img
                         src={notification.senderProfilePicUrl}
                         alt={notification.metadata?.senderName ?? ""}
-                        className="h-11 w-11 rounded-full object-cover"
+                        className="h-8 w-8 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[18px] font-semibold text-slate-900 dark:border-white/8 dark:bg-white/6 dark:text-white">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[13px] font-semibold text-slate-900 dark:border-white/8 dark:bg-white/6 dark:text-white">
                         {notificationInitial(notification)}
                       </div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-[15px] font-semibold text-slate-950 dark:text-white">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="truncate text-[12.5px] font-semibold text-slate-950 dark:text-white">
                         {notification.title}
                       </p>
-                      <span className="shrink-0 text-[11px] text-slate-400 dark:text-slate-500">
+                      <span className="shrink-0 text-[10px] text-slate-400 dark:text-slate-500">
                         {formatRelativeTime(notification.createdAt)}
                       </span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-[13px] leading-6 text-slate-500 dark:text-slate-400">
+                    <p className="mt-0.5 line-clamp-1 text-[11.5px] leading-5 text-slate-500 dark:text-slate-400">
                       {notification.body}
                     </p>
-                    <div className="mt-3 flex items-center gap-2 text-[12px] text-slate-400 dark:text-slate-500">
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] text-slate-400 dark:text-slate-500">
                       <span>{notification.metadata?.conversationName ?? "Chat"}</span>
                       <span>&bull;</span>
                       <span className="font-medium text-blue-500">Mention</span>
