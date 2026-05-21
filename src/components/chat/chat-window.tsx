@@ -946,6 +946,7 @@ export function ChatWindow({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionListRef = useRef<HTMLDivElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [showProfilePreview, setShowProfilePreview] = useState(false);
   const [previewImage, setPreviewImage] = useState<MessageAttachment | null>(
     null,
   );
@@ -1327,7 +1328,8 @@ export function ChatWindow({
                 <img
                   src={selected.profile_pic_url}
                   alt={selected.name}
-                  className="w-9 h-9 rounded-full object-cover"
+                  onClick={() => setShowProfilePreview(true)}
+                  className="w-9 h-9 rounded-full object-cover cursor-pointer transition-opacity hover:opacity-85"
                 />
               ) : (
                 <div
@@ -1969,6 +1971,22 @@ export function ChatWindow({
           onZoomIn={zoomPreviewIn}
           onZoomOut={zoomPreviewOut}
         />
+      )}
+
+      {showProfilePreview && !isGroup && selected.profile_pic_url && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowProfilePreview(false)}
+          role="presentation"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={selected.profile_pic_url}
+            alt={selected.name}
+            onClick={(e) => e.stopPropagation()}
+            className="h-64 w-64 rounded-full object-cover shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+          />
+        </div>
       )}
     </>
   );
