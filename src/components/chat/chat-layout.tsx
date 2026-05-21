@@ -3,7 +3,7 @@
 import { startTransition, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserRole } from "@/hooks/use-user-role";
 import {
@@ -36,6 +36,7 @@ import {
   type ChatMessage,
 } from "@/components/chat/chat-window";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { NotificationsPage } from "@/components/notifications/notifications-page";
 import { CreateGroupModal } from "@/components/chat/create-group-modal";
 import { createChatSocket, type ChatSocket } from "@/lib/socket";
 import type { NotificationItem } from "@/hooks/use-notifications";
@@ -256,6 +257,8 @@ function groupChatToConversation(
 export function ChatLayout() {
   const { user, token } = useAuth();
   const { isAdmin } = useUserRole(user?.userTypeCode);
+  const pathname = usePathname();
+  const isNotificationsRoute = pathname === "/notifications";
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(() =>
@@ -896,7 +899,9 @@ export function ChatLayout() {
         onCreateGroup={() => setShowCreateGroup(true)}
       />
 
-      {selected ? (
+      {isNotificationsRoute ? (
+        <NotificationsPage />
+      ) : selected ? (
         <ChatWindow
           selected={selected}
           message={message}

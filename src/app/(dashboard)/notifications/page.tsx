@@ -1,5 +1,5 @@
-import { NotificationsPage } from "@/components/notifications/notifications-page"
+import { ChatLayout } from "@/components/chat/chat-layout"
 
 export default function NotificationsRoute() {
-  return <NotificationsPage />
+  return <ChatLayout />
 }

@@ -108,7 +108,7 @@ export function NotificationBell({
               <h3 className="text-[15px] font-semibold text-slate-950 dark:text-white">
                 Notifications
               </h3>
-              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Mentions you have not cleared yet.
               </p>
             </div>
