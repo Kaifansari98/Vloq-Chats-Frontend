@@ -133,7 +133,7 @@ export function NotificationBell({
           </div>
 
           {notifications.length > 0 ? (
-            <div className="max-h-[28rem] overflow-y-auto">
+            <div className="max-h-72 overflow-y-auto">
               {notifications.map((notification) => (
                 <button
                   key={notification.uuid}
@@ -143,8 +143,18 @@ export function NotificationBell({
                     notification.isRead ? "opacity-75" : ""
                   }`}
                 >
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[18px] font-semibold text-slate-900 dark:border-white/8 dark:bg-white/6 dark:text-white">
-                    {notificationInitial(notification)}
+                  <div className="relative h-11 w-11 shrink-0 rounded-full">
+                    {notification.senderProfilePicUrl ? (
+                      <img
+                        src={notification.senderProfilePicUrl}
+                        alt={notification.metadata?.senderName ?? ""}
+                        className="h-11 w-11 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[18px] font-semibold text-slate-900 dark:border-white/8 dark:bg-white/6 dark:text-white">
+                        {notificationInitial(notification)}
+                      </div>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">

@@ -17,6 +17,7 @@ export type NotificationItem = {
     senderId?: number
     mentionedUserId?: number
   } | null
+  senderProfilePicUrl: string | null
 }
 
 type NotificationsResponse = {

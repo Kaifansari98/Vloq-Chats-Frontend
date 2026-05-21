@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CornerUpLeft, FileText, ImageIcon, Mic, Paperclip, Pause, Play, Send, Trash2, X } from "lucide-react";
 import { AttachmentDisplay } from "@/components/chat/attachment-display";
@@ -948,6 +948,11 @@ export function ChatWindow({
   const [fileError, setFileError] = useState<string | null>(null);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
   const [highlightedUuid, setHighlightedUuid] = useState<string | null>(null);
+
+  const messagesByUuid = useMemo(
+    () => new Map(messages.map((m) => [m.uuid, m])),
+    [messages],
+  );
   const [previewImage, setPreviewImage] = useState<MessageAttachment | null>(
     null,
   );
@@ -1529,9 +1534,18 @@ export function ChatWindow({
                                     {chatMessage.replyTo.senderName}
                                   </p>
                                   {chatMessage.replyTo.attachmentType === "IMAGE" ? (
-                                    <p className={`flex items-center gap-1 text-[11px] ${chatMessage.isOwnMessage ? "text-white/65" : "text-slate-500 dark:text-slate-400"}`}>
-                                      <ImageIcon className="h-3 w-3" /> Image
-                                    </p>
+                                    <div className="flex items-center justify-between gap-2 w-full">
+                                      <p className={`flex items-center gap-1 text-[11px] ${chatMessage.isOwnMessage ? "text-white/65" : "text-slate-500 dark:text-slate-400"}`}>
+                                        <ImageIcon className="h-3 w-3" /> Photo
+                                      </p>
+                                      {(() => {
+                                        const thumb = messagesByUuid.get(chatMessage.replyTo!.uuid)?.attachments.find((a) => a.attachmentType === "IMAGE")?.url;
+                                        return thumb ? (
+                                          // eslint-disable-next-line @next/next/no-img-element
+                                          <img src={thumb} alt="" className="h-10 w-10 rounded-md object-cover shrink-0" />
+                                        ) : null;
+                                      })()}
+                                    </div>
                                   ) : chatMessage.replyTo.attachmentType === "FILE" ? (
                                     <p className={`flex items-center gap-1 text-[11px] ${chatMessage.isOwnMessage ? "text-white/65" : "text-slate-500 dark:text-slate-400"}`}>
                                       <FileText className="h-3 w-3" /> File

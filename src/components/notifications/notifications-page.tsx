@@ -147,8 +147,18 @@ export function NotificationsPage() {
                         notification.isRead ? "opacity-70" : ""
                       }`}
                     >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-semibold dark:border-white/8 dark:bg-white/6">
-                        {notificationInitial(notification)}
+                      <div className="relative h-9 w-9 shrink-0 rounded-full">
+                        {notification.senderProfilePicUrl ? (
+                          <img
+                            src={notification.senderProfilePicUrl}
+                            alt={notification.metadata?.senderName ?? ""}
+                            className="h-9 w-9 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-semibold dark:border-white/8 dark:bg-white/6">
+                            {notificationInitial(notification)}
+                          </div>
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
