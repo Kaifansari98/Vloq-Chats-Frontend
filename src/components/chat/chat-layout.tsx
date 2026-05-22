@@ -329,7 +329,7 @@ export function ChatLayout() {
         prev.filter((userId) => userId !== incomingMessage.senderId),
       );
 
-      if (!incomingMessage.isOwnMessage) {
+      if (incomingMessage.senderUuid !== user?.uuid) {
         const isActiveConversation =
           selectedMemberIdRef.current === incomingMessage.senderId &&
           document.visibilityState === "visible";
