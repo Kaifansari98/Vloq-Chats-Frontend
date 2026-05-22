@@ -132,6 +132,17 @@ function getActivityTimestamp(dateString?: string) {
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
+function buildDmNotificationBody(message: { content: string | null; type: string }): string {
+  if (message.content?.trim()) return message.content.slice(0, 100);
+  switch (message.type) {
+    case "IMAGE": return "Sent an image";
+    case "VIDEO": return "Sent a video";
+    case "AUDIO": return "Sent an audio message";
+    case "FILE": return "Sent a file";
+    default: return "Sent you a message";
+  }
+}
+
 function formatLastMessagePreview(
   lastMessage?: {
     content: string | null;
@@ -281,6 +292,7 @@ export function ChatLayout() {
     Array<{ conversationUuid: string; userId: number; userName: string }>
   >([]);
   const socketRef = useRef<ChatSocket | null>(null);
+  const selectedMemberIdRef = useRef<number | undefined>(undefined);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingTargetRef = useRef<
     | { type: "direct"; participantUserId: number }
@@ -684,6 +696,8 @@ export function ChatLayout() {
   const selectedConversationId = selected?.id;
 
   useEffect(() => {
+    // Sync ref so socket handlers can read the current DM partner without stale closures
+    selectedMemberIdRef.current = selectedMemberId || undefined;
     stopTyping();
     if (!selected) {
       typingTargetRef.current = null;
