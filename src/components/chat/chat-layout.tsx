@@ -322,12 +322,44 @@ export function ChatLayout() {
     const socket = createChatSocket(token);
     socketRef.current = socket;
 
-    socket.on("direct_message:new", (incomingMessage: { senderId: number }) => {
+    socket.on("direct_message:new", (incomingMessage: DirectMessage) => {
       void queryClient.invalidateQueries({ queryKey: ["direct-messages"] });
       void queryClient.invalidateQueries({ queryKey: ["direct-chats"] });
       setTypingUserIds((prev) =>
         prev.filter((userId) => userId !== incomingMessage.senderId),
       );
+
+      if (!incomingMessage.isOwnMessage) {
+        const isActiveConversation =
+          selectedMemberIdRef.current === incomingMessage.senderId &&
+          document.visibilityState === "visible";
+
+        if (!isActiveConversation) {
+          const body = buildDmNotificationBody(incomingMessage);
+          const title = incomingMessage.senderName;
+
+          if (document.visibilityState !== "visible" && Notification.permission === "granted") {
+            const n = new Notification(title, { body, icon: "/favicon.ico" });
+            n.onclick = () => {
+              window.focus();
+              localStorage.setItem("vloq:selectedChatId", incomingMessage.senderUuid);
+              setSelectedId(incomingMessage.senderUuid);
+            };
+          }
+
+          toast.info(title, {
+            description: body,
+            duration: 5000,
+            action: {
+              label: "Open",
+              onClick: () => {
+                localStorage.setItem("vloq:selectedChatId", incomingMessage.senderUuid);
+                setSelectedId(incomingMessage.senderUuid);
+              },
+            },
+          });
+        }
+      }
     });
 
     socket.on("direct_message:read", () => {
