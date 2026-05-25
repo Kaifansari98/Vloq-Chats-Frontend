@@ -1516,7 +1516,7 @@ export function ChatWindow({
                             />
                             {/* Received: reply + download stacked vertically */}
                             {!chatMessage.isOwnMessage && (
-                              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 flex flex-col gap-1.5 opacity-0 group-hover/msg:opacity-100 transition-all duration-150">
+                              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 flex flex-row gap-1.5 opacity-0 group-hover/msg:opacity-100 transition-all duration-150">
                                 <button
                                   type="button"
                                   onClick={() => onReply?.(chatMessage)}
