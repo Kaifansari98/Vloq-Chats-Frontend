@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CornerUpLeft, Download, FileText, ImageIcon, Mic, Paperclip, Pause, Play, Send, Trash2, X } from "lucide-react";
+import { CornerUpLeft, FileText, ImageIcon, Mic, Paperclip, Pause, Play, Send, Trash2, X } from "lucide-react";
 import { AttachmentDisplay } from "@/components/chat/attachment-display";
 import { NotificationBell } from "@/components/chat/notification-bell";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
@@ -1293,23 +1293,6 @@ export function ChatWindow({
     setLiveBarHeights(Array(48).fill(0.05));
   }
 
-  async function downloadAudio(url: string, filename: string) {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = filename || "voice-message.webm";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      window.open(url, "_blank");
-    }
-  }
-
   const canSend =
     (message.trim().length > 0 || selectedFiles.length > 0) &&
     !isSendingMessage;
@@ -1514,7 +1497,7 @@ export function ChatWindow({
                               }
                               createdAt={chatMessage.createdAt}
                             />
-                            {/* Received: reply + download stacked vertically */}
+                            {/* Received: reply button only — download is now inside each player card */}
                             {!chatMessage.isOwnMessage && (
                               <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 flex flex-row gap-1.5 opacity-0 group-hover/msg:opacity-100 transition-all duration-150">
                                 <button
@@ -1524,33 +1507,6 @@ export function ChatWindow({
                                   aria-label="Reply"
                                 >
                                   <CornerUpLeft className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const audio = chatMessage.attachments.find((a) => a.mimeType.startsWith("audio/"));
-                                    if (audio) void downloadAudio(audio.url, audio.name);
-                                  }}
-                                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white dark:bg-[#1e2a3a] border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:scale-110 transition-transform"
-                                  aria-label="Download audio"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </button>
-                              </div>
-                            )}
-                            {/* Own: download only, on the left side */}
-                            {chatMessage.isOwnMessage && (
-                              <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 opacity-0 group-hover/msg:opacity-100 transition-all duration-150">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const audio = chatMessage.attachments.find((a) => a.mimeType.startsWith("audio/"));
-                                    if (audio) void downloadAudio(audio.url, audio.name);
-                                  }}
-                                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white dark:bg-[#1e2a3a] border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:scale-110 transition-transform"
-                                  aria-label="Download audio"
-                                >
-                                  <Download className="h-4 w-4" />
                                 </button>
                               </div>
                             )}

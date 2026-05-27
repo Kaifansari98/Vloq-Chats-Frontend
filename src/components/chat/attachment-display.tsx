@@ -3,6 +3,7 @@
 import { useRef, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
+  Download,
   FileArchive,
   FileSpreadsheet,
   FileText,
@@ -28,6 +29,23 @@ function formatTime(secs: number) {
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+async function downloadAudio(url: string, filename: string) {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename || "voice-message.webm";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    window.open(url, "_blank");
+  }
 }
 
 function getImageAttachmentRows(images: MessageAttachment[]) {
@@ -278,14 +296,24 @@ function AudioAttachmentPlayer({
           )}
         </div>
 
-        {/* Duration + timestamp */}
+        {/* Duration + timestamp + download */}
         <div className="flex items-center justify-between px-0.5">
           <span className="text-[10px] tabular-nums font-medium text-slate-500 dark:text-white/55">
             {formatTime(currentTime || duration)}
           </span>
-          {timeLabel && (
-            <span className="text-[10px] tabular-nums text-slate-400 dark:text-white/40">{timeLabel}</span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {timeLabel && (
+              <span className="text-[10px] tabular-nums text-slate-400 dark:text-white/40">{timeLabel}</span>
+            )}
+            <button
+              type="button"
+              onClick={() => void downloadAudio(track.url, track.name)}
+              className="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 dark:text-white/35 transition-colors hover:text-slate-600 dark:hover:text-white/70"
+              aria-label="Download audio"
+            >
+              <Download className="h-3 w-3" />
+            </button>
+          </div>
         </div>
       </div>
 
