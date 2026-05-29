@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { toast } from "sonner";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
@@ -848,6 +849,13 @@ export function ChatLayout() {
           onUploadProgress: updateProgress,
         });
       }
+    } catch (err) {
+      const description = axios.isAxiosError(err)
+        ? (err.response?.data as { message?: string })?.message ?? err.message
+        : err instanceof Error
+          ? err.message
+          : "Failed to send voice message";
+      toast.error("Upload failed", { description });
     } finally {
       URL.revokeObjectURL(objectUrl);
       setPendingMessages((prev) => prev.filter((m) => m.uuid !== pendingId));
@@ -941,6 +949,13 @@ export function ChatLayout() {
           onUploadProgress: updateProgress,
         });
       }
+    } catch (err) {
+      const description = axios.isAxiosError(err)
+        ? (err.response?.data as { message?: string })?.message ?? err.message
+        : err instanceof Error
+          ? err.message
+          : "Failed to upload files";
+      toast.error("Upload failed", { description });
     } finally {
       for (const url of objectUrls) URL.revokeObjectURL(url);
       setPendingMessages((prev) => prev.filter((m) => m.uuid !== pendingId));
