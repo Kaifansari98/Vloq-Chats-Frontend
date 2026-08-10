@@ -88,7 +88,7 @@ export function NotificationBell({
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-[0_14px_30px_-24px_rgba(15,23,42,0.65)] transition-colors hover:bg-slate-50 dark:border-white/8 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+        className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-[0_14px_30px_-24px_rgba(15,23,42,0.65)] transition-colors hover:bg-slate-50 dark:border-white/8 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
         aria-label="Open notifications"
       >
         <Bell className="h-4.5 w-4.5" />
@@ -101,7 +101,7 @@ export function NotificationBell({
 
       {open && (
         <div
-          className={`absolute z-50 ${panelPositionClass} w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_30px_60px_-26px_rgba(15,23,42,0.38)] dark:border-white/8 dark:bg-[#10192d] dark:shadow-black/40`}
+          className={`absolute z-50 ${panelPositionClass} w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_30px_60px_-26px_rgba(15,23,42,0.38)] dark:border-white/8 dark:bg-[#1f2c34] dark:shadow-black/40`}
         >
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-white/8">
             <div>

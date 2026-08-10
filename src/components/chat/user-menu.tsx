@@ -98,7 +98,9 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
   const [manageUsersOpen, setManageUsersOpen] = useState(false);
 
   // Sidebar / header profile pic (fetched on mount, updated after save)
-  const [sidebarProfilePicUrl, setSidebarProfilePicUrl] = useState<string | null>(null);
+  const [sidebarProfilePicUrl, setSidebarProfilePicUrl] = useState<
+    string | null
+  >(null);
 
   // Update Profile state
   const [updateProfileOpen, setUpdateProfileOpen] = useState(false);
@@ -107,8 +109,12 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
   const [profileRoleCode, setProfileRoleCode] = useState("MEMBER");
   const [profilePassword, setProfilePassword] = useState("");
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
-  const [profilePicPreview, setProfilePicPreview] = useState<string | null>(null);
-  const [currentProfilePicUrl, setCurrentProfilePicUrl] = useState<string | null>(null);
+  const [profilePicPreview, setProfilePicPreview] = useState<string | null>(
+    null,
+  );
+  const [currentProfilePicUrl, setCurrentProfilePicUrl] = useState<
+    string | null
+  >(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
@@ -147,7 +153,8 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
 
   // Status toggle confirmation state
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
-  const [statusConfirmTarget, setStatusConfirmTarget] = useState<OrgUser | null>(null);
+  const [statusConfirmTarget, setStatusConfirmTarget] =
+    useState<OrgUser | null>(null);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
 
   // Hovered row in the manage users list
@@ -165,7 +172,9 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await api.get<{ user: { profile_pic_url: string | null } }>("/users/me");
+        const res = await api.get<{ user: { profile_pic_url: string | null } }>(
+          "/users/me",
+        );
         setSidebarProfilePicUrl(res.data.user.profile_pic_url ?? null);
       } catch {
         // Non-fatal — keep null, initials will show
@@ -204,11 +213,17 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
         setIsLoadingProfile(false);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateProfileOpen]);
 
   useEffect(() => {
-    if ((!createUserOpen && !manageUsersOpen && !editUserOpen && !updateProfileOpen) || !isAdmin) {
+    if (
+      (!createUserOpen &&
+        !manageUsersOpen &&
+        !editUserOpen &&
+        !updateProfileOpen) ||
+      !isAdmin
+    ) {
       return;
     }
 
@@ -222,7 +237,13 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
         setRoles([]);
       }
     })();
-  }, [createUserOpen, manageUsersOpen, editUserOpen, updateProfileOpen, isAdmin]);
+  }, [
+    createUserOpen,
+    manageUsersOpen,
+    editUserOpen,
+    updateProfileOpen,
+    isAdmin,
+  ]);
 
   useEffect(() => {
     if (!manageUsersOpen || !isAdmin) return;
@@ -321,7 +342,14 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
           : `${target.name} has been deactivated.`,
       );
     } catch (error) {
-      toast.error(extractErrorMessage(error, activating ? "Failed to activate user." : "Failed to deactivate user."));
+      toast.error(
+        extractErrorMessage(
+          error,
+          activating
+            ? "Failed to activate user."
+            : "Failed to deactivate user.",
+        ),
+      );
     } finally {
       setIsTogglingStatus(false);
     }
@@ -534,8 +562,14 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
             <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[11px] font-semibold text-white shadow-md shadow-blue-500/20">
               {sidebarProfilePicUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={sidebarProfilePicUrl} alt={user?.name ?? "avatar"} className="w-full h-full object-cover" />
-              ) : initials}
+                <img
+                  src={sidebarProfilePicUrl}
+                  alt={user?.name ?? "avatar"}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                initials
+              )}
             </div>
             {!collapsed && (
               <>
@@ -560,9 +594,9 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
             align="end"
             sideOffset={12}
             className={cn(
-              "z-50 w-64 rounded-2xl shadow-2xl shadow-black/20 dark:shadow-black/60",
+              "z-50 w-64 rounded-xl shadow-2xl shadow-black/20 dark:shadow-black/60",
               "border border-slate-200 dark:border-white/9",
-              "bg-white dark:bg-[#0e1c32]",
+              "bg-white dark:bg-[#1f2c34]",
               "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
               "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
               "data-[side=right]:slide-in-from-left-2",
@@ -573,8 +607,14 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
               <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[11px] font-semibold text-white">
                 {sidebarProfilePicUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={sidebarProfilePicUrl} alt={user?.name ?? "avatar"} className="w-full h-full object-cover" />
-                ) : initials}
+                  <img
+                    src={sidebarProfilePicUrl}
+                    alt={user?.name ?? "avatar"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  initials
+                )}
               </div>
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-100 truncate">
@@ -661,13 +701,13 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
       {/* ── Logout confirmation dialog ── */}
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-2xl border border-slate-200 dark:border-white/9 bg-white dark:bg-[#0e1c32] p-6 shadow-2xl shadow-black/10 dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-xl border border-slate-200 dark:border-white/9 bg-white dark:bg-[#1f2c34] p-6 shadow-2xl shadow-black/10 dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
           <div className="w-11 h-11 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-center justify-center mb-4">
             <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-400" />
           </div>
 
           <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-white mb-1.5">
-            Log out of ButterFly Chats?
+            Log out of Nexyn Chats?
           </Dialog.Title>
           <Dialog.Description className="text-[13px] text-slate-500 leading-relaxed mb-6">
             You&apos;ll be signed out of your account and redirected to the
@@ -694,7 +734,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
       <Dialog.Root open={createUserOpen} onOpenChange={setCreateUserOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#0e1c32] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#1f2c34] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-white">
@@ -798,7 +838,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
       >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex flex-col w-full max-w-lg max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#0e1c32] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex flex-col w-full max-w-lg max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#1f2c34] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
             {/* Header */}
             <div className="flex items-center justify-between gap-4 px-6 pt-6 pb-4 border-b border-slate-200 dark:border-white/7 shrink-0">
               <div className="flex items-center gap-3">
@@ -1079,7 +1119,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
       <Dialog.Root open={editUserOpen} onOpenChange={setEditUserOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#0e1c32] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#1f2c34] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-white">
@@ -1184,7 +1224,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
       <Dialog.Root open={deleteUserOpen} onOpenChange={setDeleteUserOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-2xl border border-slate-200 dark:border-white/9 bg-white dark:bg-[#0e1c32] p-6 shadow-2xl shadow-black/10 dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-xl border border-slate-200 dark:border-white/9 bg-white dark:bg-[#1f2c34] p-6 shadow-2xl shadow-black/10 dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
             <div className="w-11 h-11 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-center justify-center mb-4">
               <Trash2 className="w-5 h-5 text-red-500 dark:text-red-400" />
             </div>
@@ -1226,7 +1266,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
       <Dialog.Root open={statusConfirmOpen} onOpenChange={setStatusConfirmOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-2xl border border-slate-200 dark:border-white/9 bg-white dark:bg-[#0e1c32] p-6 shadow-2xl shadow-black/10 dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-xl border border-slate-200 dark:border-white/9 bg-white dark:bg-[#1f2c34] p-6 shadow-2xl shadow-black/10 dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
             <div
               className={cn(
                 "w-11 h-11 rounded-2xl border flex items-center justify-center mb-4",
@@ -1252,7 +1292,8 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
                   <span className="font-medium text-slate-700 dark:text-slate-300">
                     {statusConfirmTarget.name}
                   </span>{" "}
-                  will be deactivated and immediately lose access to the workspace. You can reactivate them at any time.
+                  will be deactivated and immediately lose access to the
+                  workspace. You can reactivate them at any time.
                 </>
               ) : (
                 <>
@@ -1309,8 +1350,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
       >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#0e1c32] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
-
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#1f2c34] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
             {/* Header */}
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
@@ -1338,7 +1378,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
                 <div className="flex flex-col items-center gap-3">
                   <div className="relative group">
                     <div className="w-20 h-20 rounded-full overflow-hidden ring-4 ring-slate-100 dark:ring-white/8 shadow-lg">
-                      {profilePicPreview ?? currentProfilePicUrl ? (
+                      {(profilePicPreview ?? currentProfilePicUrl) ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={profilePicPreview ?? currentProfilePicUrl ?? ""}
@@ -1373,11 +1413,16 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
                     onClick={() => profilePicInputRef.current?.click()}
                     className="text-[12px] font-medium text-blue-500 dark:text-blue-400 hover:underline"
                   >
-                    {profilePicPreview ? "Change photo" : currentProfilePicUrl ? "Replace photo" : "Upload photo"}
+                    {profilePicPreview
+                      ? "Change photo"
+                      : currentProfilePicUrl
+                        ? "Replace photo"
+                        : "Upload photo"}
                   </button>
                   {profilePicFile && (
                     <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                      {profilePicFile.name} · {(profilePicFile.size / 1024).toFixed(0)} KB
+                      {profilePicFile.name} ·{" "}
+                      {(profilePicFile.size / 1024).toFixed(0)} KB
                     </p>
                   )}
                 </div>
@@ -1464,7 +1509,9 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
                   }
                   className="flex-1 h-10 rounded-xl bg-blue-500 text-sm font-medium text-white transition-colors hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isSavingProfile && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {isSavingProfile && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  )}
                   {isSavingProfile ? "Saving..." : "Save changes"}
                 </button>
               </div>

@@ -21,6 +21,12 @@ import {
 import type { LoginRequest, LoginResponse } from "@/types/auth"
 import { cn } from "@/lib/utils"
 
+import { Eye, EyeOff } from "lucide-react"
+
+import Image from "next/image"
+import nexynLogo from "@/assets/nexynchat.png"
+import nexynLogoDark from "@/assets/nexynchatdark.png"
+
 export function LoginForm({
   className,
   ...props
@@ -30,6 +36,8 @@ export function LoginForm({
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isPending, startTransition] = useTransition()
+
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -71,7 +79,7 @@ export function LoginForm({
       <FieldGroup>
         <div className="flex flex-col items-center text-center">
           <h1 className="text-2xl font-bold">Login to your account</h1>
-          <p className="text-sm text-balance text-muted-foreground">
+          <p className="text-sm text-balance text-muted-foreground mt-2">
             Enter your email below to login to your account
           </p>
         </div>
@@ -85,6 +93,7 @@ export function LoginForm({
             className="bg-background"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
+            suppressHydrationWarning
           />
         </Field>
         <Field>
@@ -97,14 +106,29 @@ export function LoginForm({
               Forgot your password?
             </a> */}
           </div>
-          <Input
-            id="password"
-            type="password"
-            required
-            className="bg-background"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              required
+              className="bg-background pr-10"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              suppressHydrationWarning
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors focus:outline-none"
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+            </button>
+          </div>
         </Field>
         {error ? (
           <FieldDescription className="text-center text-red-500">
@@ -112,7 +136,11 @@ export function LoginForm({
           </FieldDescription>
         ) : null}
         <Field>
-          <Button type="submit" disabled={isPending}>
+          <Button
+            type="submit"
+            disabled={isPending}
+            className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-semibold h-11 rounded-xl shadow-md transition-all active:scale-[0.99]"
+          >
             {isPending ? "Logging in..." : "Login"}
           </Button>
         </Field>

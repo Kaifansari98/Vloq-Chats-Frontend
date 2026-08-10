@@ -63,12 +63,12 @@ export function NotificationManager() {
           serviceWorkerRegistration,
         });
       } catch (err) {
-        // AbortError ("Registration failed - push service not available") is a transient
-        // browser/network condition — not a bug worth surfacing in the console.
-        if (err instanceof DOMException && err.name === "AbortError") {
-          return;
-        }
-        throw err;
+        // Quietly warn rather than throwing exceptions when keys/PushManager are unconfigured in dev
+        console.warn(
+          "[NotificationManager] Push notifications unconfigured or disabled on this browser:",
+          err,
+        );
+        return;
       }
 
       if (!currentToken || isCancelled) {

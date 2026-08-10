@@ -26,6 +26,7 @@ export type GroupChat = {
   uuid: string
   type: "GROUP"
   name: string
+  avatarUrl?: string | null
   createdAt: string
   updatedAt: string
   unreadCount: number

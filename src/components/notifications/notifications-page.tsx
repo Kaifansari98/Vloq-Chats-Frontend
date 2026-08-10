@@ -107,7 +107,7 @@ export function NotificationsPage() {
   }
 
   return (
-    <main className="flex-1 min-w-0 h-full overflow-y-auto bg-white px-6 py-7 text-slate-950 dark:bg-[#070d1e] dark:text-white">
+    <main className="flex-1 min-w-0 h-full overflow-y-auto bg-white px-6 py-7 text-slate-950 dark:bg-[var(--background)] dark:text-white">
       <div className="">
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
@@ -143,7 +143,7 @@ export function NotificationsPage() {
             Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
-                className="h-20 animate-pulse rounded-2xl border border-slate-200 bg-slate-50 dark:border-white/8 dark:bg-white/5"
+                className="h-20 animate-pulse rounded-xl border border-slate-200 bg-slate-50 dark:border-white/8 dark:bg-white/5"
               />
             ))
           ) : groups.length > 0 ? (
@@ -162,7 +162,7 @@ export function NotificationsPage() {
                       key={notification.uuid}
                       type="button"
                       onClick={() => void openNotification(notification)}
-                      className={`flex w-full items-start gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_4px_16px_-8px_rgba(15,23,42,0.2)] transition-colors hover:bg-slate-50 dark:border-white/8 dark:bg-white/4 dark:hover:bg-white/7 ${
+                      className={`flex w-full items-start gap-4 rounded-xl border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_4px_16px_-8px_rgba(15,23,42,0.2)] transition-colors hover:bg-slate-50 dark:border-white/8 dark:bg-[#1f2c34] dark:hover:bg-[#202c33] ${
                         notification.isRead ? "opacity-70" : ""
                       }`}
                     >
@@ -207,7 +207,7 @@ export function NotificationsPage() {
               </section>
             ))
           ) : (
-            <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-center dark:border-white/10 dark:bg-white/4">
+            <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center dark:border-white/10 dark:bg-white/4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-[0_8px_20px_-12px_rgba(15,23,42,0.5)] dark:bg-white/8 dark:shadow-none">
                 <Bell className="h-5 w-5 text-slate-400 dark:text-slate-500" />
               </div>

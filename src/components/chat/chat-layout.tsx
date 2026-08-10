@@ -4,7 +4,7 @@ import { startTransition, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserRole } from "@/hooks/use-user-role";
 import {
@@ -252,6 +252,7 @@ function groupChatToConversation(
     online: false,
     isTyping: false,
     gradient,
+    profile_pic_url: groupChat.avatarUrl ?? null,
     participants: groupChat.participants.map((p) => ({
       id: p.id,
       name: p.name,
@@ -270,6 +271,7 @@ export function ChatLayout() {
   const { user, token } = useAuth();
   const { isAdmin } = useUserRole(user?.userTypeCode);
   const pathname = usePathname();
+  const router = useRouter();
   const isNotificationsRoute = pathname === "/notifications";
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -723,6 +725,9 @@ export function ChatLayout() {
     setReplyToMessage(null);
     setSelectedId(id);
     localStorage.setItem("vloq:selectedChatId", id);
+    if (pathname !== "/") {
+      router.push(`/?chat=${encodeURIComponent(id)}`);
+    }
   }
 
   const selectedMemberId = selected?.memberId;
@@ -963,7 +968,7 @@ export function ChatLayout() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#070d1e] text-slate-900 dark:text-slate-100">
+    <div className="flex h-screen overflow-hidden bg-[var(--background)] text-[var(--text-primary)]">
       <ChatSidebar
         conversations={conversations}
         selectedId={effectiveSelectedId}
@@ -980,6 +985,18 @@ export function ChatLayout() {
         onFilterChange={setActiveFilter}
         onCreateGroup={() => setShowCreateGroup(true)}
       />
+
+      {/* Reopen button when sidebar collapsed */}
+      {isSidebarCollapsed && (
+        <button
+          type="button"
+          onClick={() => setIsSidebarCollapsed(false)}
+          title="Open sidebar"
+          className="absolute left-[80px] top-1/2 z-30 flex h-10 w-6 -translate-y-1/2 items-center justify-center rounded-r-xl bg-[var(--sidebar-header)] border border-[var(--border-color)] border-l-0 text-[var(--text-secondary)] shadow-md hover:text-[var(--text-primary)] transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      )}
 
       {isNotificationsRoute ? (
         <NotificationsPage />

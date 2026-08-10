@@ -150,7 +150,29 @@ export const AnimatedThemeToggler = ({
       attributeFilter: ["class"],
     })
 
-    return () => observer.disconnect()
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      // Ignore if user is currently typing inside input or textarea or editable element
+      const target = event.target as HTMLElement | null
+      const isInput =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+
+      if (isInput) return
+
+      if (event.key === "d" || event.key === "D") {
+        event.preventDefault()
+        buttonRef.current?.click()
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalKeyDown)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener("keydown", handleGlobalKeyDown)
+    }
   }, [])
 
   const toggleTheme = useCallback(() => {

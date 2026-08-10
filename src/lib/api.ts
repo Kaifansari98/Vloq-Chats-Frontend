@@ -3,7 +3,7 @@ import { AUTH_TOKEN_COOKIE, AUTH_USER_COOKIE } from "@/lib/auth";
 
 const API_URLS_BY_ENVIRONMENT: Record<string, string> = {
   LOCAL: "http://localhost:4000/",
-  PRODUCTION: "https://api-chat.butterflyai.io/",
+  PRODUCTION: "https://api-chat.nexyn.com/",
 };
 
 const environment =

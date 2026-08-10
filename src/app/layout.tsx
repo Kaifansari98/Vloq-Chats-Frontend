@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ButterFly AI - Chats",
-  description: "Workspace for Vloq chat operations and collaboration.",
+  title: "Nexyn Chat",
+  description: "Workspace for Nexyn Chat operations and collaboration.",
   icons: {
     icon: "/favicon.ico",
   },
@@ -33,7 +34,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen antialiased" suppressHydrationWarning>
-        {children}
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
         <Toaster richColors position="bottom-right" />
       </body>
     </html>

@@ -25,8 +25,8 @@ const OVERLAY =
 
 const CONTENT =
   "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 " +
-  "rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-black/10 " +
-  "dark:border-white/9 dark:bg-[#0e1c32] dark:shadow-black/60 " +
+  "rounded-xl border border-slate-200 bg-white shadow-2xl shadow-black/10 " +
+  "dark:border-white/9 dark:bg-[#1f2c34] dark:shadow-black/60 " +
   "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 " +
   "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95";
 
@@ -138,7 +138,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 dark:border-white/8 overflow-hidden">
+                <div className="rounded-xl border border-slate-200 dark:border-white/8 overflow-hidden">
                   {/* IP restriction row */}
                   <div className="flex items-start justify-between gap-4 px-4 py-4">
                     <div className="min-w-0">
@@ -367,7 +367,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               " p-6"
             }
           >
-            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10">
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10">
               <Shield className="h-5 w-5 text-amber-500 dark:text-amber-400" />
             </div>
 
@@ -412,7 +412,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               " p-6"
             }
           >
-            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/10">
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/10">
               <Trash2 className="h-5 w-5 text-red-500 dark:text-red-400" />
             </div>
 

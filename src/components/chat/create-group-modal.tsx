@@ -396,8 +396,13 @@ export function CreateGroupModal({ open, onOpenChange, currentUserUuid }: Create
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[min(480px,95vw)] h-[min(640px,92vh)] bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/8 overflow-hidden flex flex-col focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[min(480px,95vw)] h-[min(640px,92vh)] bg-white dark:bg-[#1f2c34] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
         >
+          <Dialog.Title className="sr-only">Create Group Chat</Dialog.Title>
+          <Dialog.Description className="sr-only">
+            Select members and customize the group details to create a new
+            conversation.
+          </Dialog.Description>
           <AnimatePresence mode="wait" initial={false}>
             {step === "select" ? (
               <motion.div
