@@ -72,25 +72,6 @@ const CATEGORIES = [
     ),
   },
   {
-    name: "Activities",
-    icon: (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="w-[18px] h-[18px]"
-      >
-        <circle cx="12" cy="12" r="10" />
-        <path d="M6.2 6.2L17.8 17.8" />
-        <path d="M17.8 6.2L6.2 17.8" />
-        <circle cx="12" cy="12" r="4" />
-      </svg>
-    ),
-  },
-  {
     name: "Travel & Places",
     icon: (
       <svg
@@ -106,6 +87,25 @@ const CATEGORIES = [
         <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
         <circle cx="5.5" cy="18.5" r="2.5" />
         <circle cx="18.5" cy="18.5" r="2.5" />
+      </svg>
+    ),
+  },
+  {
+    name: "Activities",
+    icon: (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="w-[18px] h-[18px]"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <path d="M6.2 6.2L17.8 17.8" />
+        <path d="M17.8 6.2L6.2 17.8" />
+        <circle cx="12" cy="12" r="4" />
       </svg>
     ),
   },
@@ -173,8 +173,8 @@ const mapCategoryToTab = (catName: string): number => {
     return 0;
   if (lower.includes("animal") || lower.includes("nature")) return 1;
   if (lower.includes("food") || lower.includes("drink")) return 2;
-  if (lower.includes("activit")) return 3;
-  if (lower.includes("travel") || lower.includes("place")) return 4;
+  if (lower.includes("travel") || lower.includes("place")) return 3;
+  if (lower.includes("activit")) return 4;
   if (lower.includes("object")) return 5;
   if (lower.includes("symbol")) return 6;
   if (lower.includes("flag")) return 7;
@@ -239,17 +239,43 @@ export function EmojiPickerButton({ onSelect }: EmojiPickerButtonProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticScrollRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const rafIdRef = useRef<number | null>(null);
 
   // Reset active tab when picker opens
   useEffect(() => {
     if (open) {
       setActiveTab(0);
+      isProgrammaticScrollRef.current = false;
     }
   }, [open]);
+
+  // Clean up timers & animation frames on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+    };
+  }, []);
 
   const scrollToCategory = (tabIndex: number) => {
     const viewport = viewportRef.current;
     if (!viewport) return;
+
+    // Immediately highlight the clicked tab for instant visual feedback
+    setActiveTab(tabIndex);
+
+    // Prevent onScroll from overriding activeTab while jumping
+    isProgrammaticScrollRef.current = true;
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
     const headers = viewport.querySelectorAll("[data-category]");
     let targetHeader: HTMLElement | null = null;
 
@@ -263,37 +289,77 @@ export function EmojiPickerButton({ onSelect }: EmojiPickerButtonProps) {
     }
 
     if (targetHeader) {
-      const parentEl = (targetHeader as HTMLElement).parentElement;
-      if (parentEl) {
+      const categoryEl = (targetHeader.closest("[frimousse-category]") ||
+        targetHeader.parentElement) as HTMLElement;
+
+      if (categoryEl) {
+        const viewportRect = viewport.getBoundingClientRect();
+        const categoryRect = categoryEl.getBoundingClientRect();
+        const targetScrollTop =
+          categoryRect.top - viewportRect.top + viewport.scrollTop;
+
+        // Instant scroll avoids virtualized list layout-shift bounces
         viewport.scrollTo({
-          top: parentEl.offsetTop,
-          behavior: "smooth",
+          top: Math.max(0, targetScrollTop),
+          behavior: "auto",
         });
-        setActiveTab(tabIndex);
       }
     }
+
+    // Unlock manual scroll listener after layout settles
+    scrollTimeoutRef.current = setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 150);
   };
 
   const handleViewportScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const viewport = e.currentTarget;
-    const headers = viewport.querySelectorAll("[data-category]");
-    let currentActive = "";
-    let minDiff = Infinity;
+    // Ignore manual scroll detection during programmatic tab jumps
+    if (isProgrammaticScrollRef.current) return;
 
-    headers.forEach((header) => {
-      const el = header as HTMLElement;
-      const parentEl = el.parentElement;
-      if (!parentEl) return;
-      const diff = viewport.scrollTop - parentEl.offsetTop;
-      if (diff >= -10 && diff < minDiff) {
-        minDiff = diff;
-        currentActive = el.getAttribute("data-category") || "";
+    const viewport = e.currentTarget;
+
+    // Throttle scroll-spy calculations to 1 per animation frame
+    if (rafIdRef.current !== null) return;
+
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+
+      const headers = viewport.querySelectorAll("[data-category]");
+      if (!headers.length) return;
+
+      const viewportRect = viewport.getBoundingClientRect();
+      let currentActive = "";
+      let maxTopOffset = -Infinity;
+
+      headers.forEach((header) => {
+        const el = header as HTMLElement;
+        const categoryEl = (el.closest("[frimousse-category]") ||
+          el.parentElement) as HTMLElement;
+        if (!categoryEl) return;
+
+        const categoryRect = categoryEl.getBoundingClientRect();
+        const topOffset = categoryRect.top - viewportRect.top;
+        const bottomOffset = categoryRect.bottom - viewportRect.top;
+
+        // A category is active if its top edge is near or above viewport top,
+        // and its bottom edge is still visible inside viewport.
+        if (topOffset <= 50 && bottomOffset > 10) {
+          if (topOffset > maxTopOffset) {
+            maxTopOffset = topOffset;
+            currentActive = el.getAttribute("data-category") || "";
+          }
+        }
+      });
+
+      if (!currentActive && headers.length > 0) {
+        currentActive = headers[0].getAttribute("data-category") || "";
+      }
+
+      if (currentActive) {
+        const targetTab = mapCategoryToTab(currentActive);
+        setActiveTab((prev) => (prev !== targetTab ? targetTab : prev));
       }
     });
-
-    if (currentActive) {
-      setActiveTab(mapCategoryToTab(currentActive));
-    }
   };
 
   return (

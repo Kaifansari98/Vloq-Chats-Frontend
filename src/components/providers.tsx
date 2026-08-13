@@ -11,7 +11,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationManager />
-      <Toaster position="top-right" closeButton />
+      <Toaster position="top-center" closeButton />
       {children}
     </QueryClientProvider>
   )

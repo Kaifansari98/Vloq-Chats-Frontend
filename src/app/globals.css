@@ -191,3 +191,90 @@ a {
   animation: none;
   mix-blend-mode: normal;
 }
+
+/* Incoming chat notification banner */
+[data-sonner-toaster][data-x-position="center"] {
+  --width: min(calc(100vw - 24px), 2024px);
+  --offset-top: 10px;
+}
+
+[data-sonner-toast].chat-notification {
+  min-height: 108px;
+  width: var(--width);
+  padding: 20px 68px 20px 28px;
+  align-items: flex-start;
+  gap: 0;
+  border: 0;
+  border-left: 7px solid #e13276;
+  border-radius: 18px;
+  background: #f5f5f5;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 12%);
+  color: #1f2937;
+}
+
+[data-sonner-toast].chat-notification [data-icon] {
+  display: none;
+}
+
+[data-sonner-toast].chat-notification [data-content] {
+  gap: 4px;
+}
+
+[data-sonner-toast].chat-notification [data-title] {
+  color: #e13276;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+[data-sonner-toast].chat-notification [data-description] {
+  color: #5f6368;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+[data-sonner-toast].chat-notification [data-close-button] {
+  top: 50%;
+  right: 22px;
+  left: auto;
+  height: 32px;
+  width: 32px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #111;
+}
+
+[data-sonner-toast].chat-notification [data-close-button]:hover {
+  background: rgb(0 0 0 / 6%);
+  border: 0;
+  border-radius: 8px;
+}
+
+[data-sonner-toast].chat-notification [data-close-button] svg {
+  height: 28px;
+  width: 28px;
+  stroke-width: 2.5;
+}
+
+@media (max-width: 600px) {
+  [data-sonner-toast].chat-notification {
+    min-height: 88px;
+    padding: 16px 54px 16px 20px;
+    border-left-width: 5px;
+    border-radius: 14px;
+  }
+
+  [data-sonner-toast].chat-notification [data-title] {
+    font-size: 16px;
+  }
+
+  [data-sonner-toast].chat-notification [data-description] {
+    font-size: 14px;
+  }
+
+  [data-sonner-toast].chat-notification [data-close-button] {
+    right: 14px;
+  }
+}

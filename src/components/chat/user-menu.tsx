@@ -25,6 +25,15 @@ import {
 } from "lucide-react";
 import { PasswordStrengthField } from "@/components/comp-51";
 import { SettingsModal } from "@/components/chat/settings-modal";
+import { BaseModal } from "@/components/ui/base-modal";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserRole } from "@/hooks/use-user-role";
 import { AUTH_TOKEN_COOKIE, AUTH_USER_COOKIE } from "@/lib/auth";
@@ -50,12 +59,12 @@ type OrgUser = {
 const USERS_PER_PAGE = 10;
 
 const AVATAR_COLORS = [
-  "from-blue-500 to-blue-600",
+  "from-[#00a884] to-emerald-600",
+  "from-teal-500 to-emerald-700",
   "from-violet-500 to-purple-600",
-  "from-emerald-500 to-green-600",
-  "from-orange-500 to-amber-600",
-  "from-rose-500 to-red-600",
-  "from-sky-500 to-cyan-600",
+  "from-emerald-600 to-teal-800",
+  "from-amber-500 to-orange-600",
+  "from-rose-500 to-pink-600",
 ];
 
 function avatarColor(name: string): string {
@@ -559,7 +568,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
               collapsed ? "justify-center px-0 py-3" : "gap-3 px-3 py-2.5"
             }`}
           >
-            <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[11px] font-semibold text-white shadow-md shadow-blue-500/20">
+            <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden bg-gradient-to-br from-[#00a884] to-emerald-600 flex items-center justify-center text-[11px] font-semibold text-white shadow-md shadow-emerald-500/20">
               {sidebarProfilePicUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -604,7 +613,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
           >
             {/* User header */}
             <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-200 dark:border-white/7">
-              <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-[11px] font-semibold text-white">
+              <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden bg-gradient-to-br from-[#00a884] to-emerald-600 flex items-center justify-center text-[11px] font-semibold text-white">
                 {sidebarProfilePicUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -731,494 +740,475 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
       </Dialog.Portal>
 
       {/* ── Create User dialog ── */}
-      <Dialog.Root open={createUserOpen} onOpenChange={setCreateUserOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#1f2c34] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-white">
-                  Create User
-                </Dialog.Title>
-                <Dialog.Description className="text-[13px] text-slate-500 dark:text-slate-400">
-                  Add a new member to this workspace using email login.
-                </Dialog.Description>
-              </div>
-              <Dialog.Close asChild>
-                <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 dark:border-white/8 dark:bg-white/4 dark:text-slate-400 dark:hover:bg-white/8">
-                  <X className="h-4 w-4" />
-                </button>
-              </Dialog.Close>
+      <BaseModal
+        open={createUserOpen}
+        onOpenChange={setCreateUserOpen}
+        title={
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center shrink-0">
+              <UserPlus className="w-4 h-4 text-[var(--accent)]" />
             </div>
+            <span>Create User</span>
+          </div>
+        }
+        desc="Add a new member to this workspace using email login."
+        size="md"
+        footer={
+          <div className="flex items-center gap-3 w-full">
+            <button
+              type="button"
+              onClick={() => setCreateUserOpen(false)}
+              className="flex-1 h-10 rounded-xl border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:border-white/9 dark:bg-white/4 dark:text-slate-300 dark:hover:bg-white/8 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateUser}
+              disabled={
+                isSubmitting ||
+                name.trim().length < 2 ||
+                email.trim().length === 0 ||
+                password.length < 6 ||
+                selectedRoleCode.length === 0
+              }
+              className="flex-1 h-10 rounded-xl bg-[var(--accent)] text-sm font-semibold text-white transition-all hover:brightness-110 shadow-md shadow-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            >
+              {isSubmitting ? "Creating..." : "Create User"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              Full name
+            </label>
+            <Input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter user name"
+            />
+          </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
-                  Full name
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter user name"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
-                />
-              </div>
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              Email
+            </label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter email address"
+            />
+          </div>
 
-              <div>
-                <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter email address"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
-                />
-              </div>
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              User Role
+            </label>
+            <Select value={selectedRoleCode} onValueChange={setSelectedRoleCode}>
+              <SelectTrigger className="h-11 w-full rounded-xl border border-[var(--border-color)] bg-[var(--input-bg)] px-3.5 text-sm text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent)]/30">
+                <SelectValue placeholder="Select user role" />
+              </SelectTrigger>
+              <SelectContent className="z-[70] rounded-xl bg-white dark:bg-[#1f2c34] border border-slate-200 dark:border-white/10 shadow-xl">
+                <SelectItem value="MEMBER">Member</SelectItem>
+                <SelectItem value="ADMIN">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-              <div>
-                <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
-                  User Role
-                </label>
-                <select
-                  value={selectedRoleCode}
-                  onChange={(e) => setSelectedRoleCode(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
-                >
-                  <option value="MEMBER">Member</option>
-                  <option value="ADMIN">Admin</option>
-                </select>
-              </div>
+          <div>
+            <PasswordStrengthField
+              label="Password"
+              placeholder="Minimum 6 characters"
+              value={password}
+              onChange={setPassword}
+            />
+          </div>
 
-              <div>
-                <PasswordStrengthField
-                  label="Password"
-                  placeholder="Minimum 6 characters"
-                  value={password}
-                  onChange={setPassword}
-                />
-              </div>
-
-              {submitError && (
-                <p className="text-[12px] text-rose-500">{submitError}</p>
-              )}
-            </div>
-
-            <div className="mt-6 flex items-center gap-3">
-              <Dialog.Close asChild>
-                <button className="flex-1 h-10 rounded-xl border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:border-white/9 dark:bg-white/4 dark:text-slate-300 dark:hover:bg-white/8">
-                  Cancel
-                </button>
-              </Dialog.Close>
-              <button
-                type="button"
-                onClick={handleCreateUser}
-                disabled={
-                  isSubmitting ||
-                  name.trim().length < 2 ||
-                  email.trim().length === 0 ||
-                  password.length < 6 ||
-                  selectedRoleCode.length === 0
-                }
-                className="flex-1 h-10 rounded-xl bg-blue-500 text-sm font-medium text-white transition-colors hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isSubmitting ? "Creating..." : "Create User"}
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+          {submitError && (
+            <p className="text-[12px] text-rose-500 font-medium">{submitError}</p>
+          )}
+        </div>
+      </BaseModal>
 
       {/* ── Manage Users dialog ── */}
-      <Dialog.Root
+      <BaseModal
         open={manageUsersOpen}
         onOpenChange={handleManageUsersOpenChange}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex flex-col w-full max-w-lg max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#1f2c34] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-4 px-6 pt-6 pb-4 border-b border-slate-200 dark:border-white/7 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 flex items-center justify-center shrink-0">
-                  <Users className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                </div>
-                <div>
-                  <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-white leading-none">
-                    Manage Users
-                  </Dialog.Title>
-                  <Dialog.Description className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {orgUsersLoading && orgUsersTotal === 0
-                      ? "Loading..."
-                      : orgUsersTotal > 0
-                        ? `${orgUsersTotal} member${orgUsersTotal !== 1 ? "s" : ""} in your organization`
-                        : "No members found"}
-                  </Dialog.Description>
-                </div>
-              </div>
-              <Dialog.Close asChild>
-                <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 dark:border-white/8 dark:bg-white/4 dark:text-slate-400 dark:hover:bg-white/8">
-                  <X className="h-4 w-4" />
-                </button>
-              </Dialog.Close>
+        size="xl"
+        className="max-h-[82vh] sm:max-h-[560px] h-[560px]"
+        title={
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4 text-[var(--accent)]" />
             </div>
-
-            {/* Search */}
-            <div className="px-4 py-3 border-b border-slate-100 dark:border-white/5 shrink-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
-                <input
-                  type="text"
-                  value={orgUsersSearch}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  placeholder="Search by name or email..."
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-blue-400 focus:bg-white dark:border-white/8 dark:bg-white/4 dark:text-slate-100 dark:focus:bg-white/6 placeholder:text-slate-400 dark:placeholder:text-slate-600"
-                />
-              </div>
-            </div>
-
-            {/* User list */}
-            <div className="overflow-y-auto flex-1 px-3 py-2">
-              {/* Loading skeletons */}
-              {orgUsersLoading && (
-                <div className="space-y-0.5 py-1">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-3 px-3 py-3 rounded-xl animate-pulse"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-white/8 shrink-0" />
-                      <div className="flex-1 space-y-1.5 min-w-0">
-                        <div className="h-3 w-28 rounded-md bg-slate-200 dark:bg-white/8" />
-                        <div className="h-2.5 w-44 rounded-md bg-slate-100 dark:bg-white/5" />
-                      </div>
-                      <div className="h-5 w-14 rounded-full bg-slate-100 dark:bg-white/5 shrink-0" />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Empty state */}
-              {!orgUsersLoading && orgUsers.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/6 flex items-center justify-center mb-3">
-                    <Users className="w-5 h-5 text-slate-400 dark:text-slate-500" />
-                  </div>
-                  <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400">
-                    {orgUsersSearch
-                      ? "No members match your search"
-                      : "No members found"}
-                  </p>
-                  {orgUsersSearch && (
-                    <button
-                      onClick={() => handleSearchChange("")}
-                      className="mt-2 text-[12px] text-blue-500 dark:text-blue-400 hover:underline"
-                    >
-                      Clear search
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* User rows */}
-              {!orgUsersLoading && orgUsers.length > 0 && (
-                <div className="space-y-0.5 py-1">
-                  {orgUsers.map((u) => {
-                    const userInitials = getUserInitials(u.name);
-                    const color = avatarColor(u.name);
-                    const roleCode = roleMap[u.userTypeId] ?? "MEMBER";
-                    const isCurrentUser = u.email === user?.email;
-                    const isHovered = hoveredUserUuid === u.uuid;
-
-                    return (
-                      <div
-                        key={u.uuid}
-                        onMouseEnter={() => setHoveredUserUuid(u.uuid)}
-                        onMouseLeave={() => setHoveredUserUuid(null)}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-white/4 transition-colors"
-                      >
-                        {/* Avatar */}
-                        <div
-                          className={`w-9 h-9 shrink-0 rounded-full bg-linear-to-br ${color} flex items-center justify-center text-[11px] font-semibold text-white`}
-                        >
-                          {userInitials}
-                        </div>
-
-                        {/* Name & email */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <p className="text-[13px] font-medium text-slate-800 dark:text-slate-100 truncate">
-                              {u.name}
-                            </p>
-                            {isCurrentUser && (
-                              <span className="shrink-0 text-[10px] font-medium text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 dark:border-blue-500/20 rounded-full px-1.5 py-px">
-                                You
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">
-                            {u.email}
-                          </p>
-                        </div>
-
-                        {/* Role badge — always visible, slides left when action buttons appear */}
-                        <motion.span
-                          layout="position"
-                          transition={{ duration: 0.18, ease: "easeOut" }}
-                          className={cn(
-                            "shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full border",
-                            roleCode === "ADMIN"
-                              ? "bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20"
-                              : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-white/6 dark:text-slate-400 dark:border-white/10",
-                          )}
-                        >
-                          {roleCode === "ADMIN" ? "Admin" : "Member"}
-                        </motion.span>
-
-                        {/* Action buttons — slide in from right on hover */}
-                        <AnimatePresence initial={false}>
-                          {isHovered && (
-                            <motion.div
-                              key="actions"
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: 20 }}
-                              transition={{ duration: 0.18, ease: "easeOut" }}
-                              className="flex items-center gap-1 shrink-0"
-                            >
-                              {/* Edit */}
-                              <motion.button
-                                initial={{ opacity: 0, x: 12 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{
-                                  duration: 0.18,
-                                  delay: 0.03,
-                                  ease: "easeOut",
-                                }}
-                                onClick={() => openEditUser(u)}
-                                title="Edit user"
-                                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-500/10 dark:hover:text-blue-400 transition-colors"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </motion.button>
-
-                              {/* Activate — solid green when already active (current state) */}
-                              <motion.button
-                                initial={{ opacity: 0, x: 12 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{
-                                  duration: 0.18,
-                                  delay: 0.06,
-                                  ease: "easeOut",
-                                }}
-                                onClick={() => {
-                                  if (!u.isActive) openStatusConfirm(u);
-                                }}
-                                title={
-                                  u.isActive
-                                    ? "User is active"
-                                    : "Activate user"
-                                }
-                                className={cn(
-                                  "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
-                                  u.isActive
-                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 cursor-default"
-                                    : "text-slate-400 dark:text-slate-500 hover:bg-emerald-50 hover:text-emerald-500 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400",
-                                )}
-                              >
-                                <UserRoundCheck className="w-3.5 h-3.5" />
-                              </motion.button>
-
-                              {/* Deactivate — solid rose when already inactive (current state) */}
-                              <motion.button
-                                initial={{ opacity: 0, x: 12 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{
-                                  duration: 0.18,
-                                  delay: 0.09,
-                                  ease: "easeOut",
-                                }}
-                                onClick={() => {
-                                  if (u.isActive) openStatusConfirm(u);
-                                }}
-                                title={
-                                  u.isActive
-                                    ? "Deactivate user"
-                                    : "User is inactive"
-                                }
-                                className={cn(
-                                  "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
-                                  !u.isActive
-                                    ? "bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 cursor-default"
-                                    : "text-slate-400 dark:text-slate-500 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-500/10 dark:hover:text-rose-400",
-                                )}
-                              >
-                                <UserRoundX className="w-3.5 h-3.5" />
-                              </motion.button>
-
-                              {/* Delete */}
-                              {!isCurrentUser && (
-                                <motion.button
-                                  initial={{ opacity: 0, x: 12 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{
-                                    duration: 0.18,
-                                    delay: 0.12,
-                                    ease: "easeOut",
-                                  }}
-                                  onClick={() => openDeleteUser(u)}
-                                  title="Delete user"
-                                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </motion.button>
-                              )}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Pagination */}
-            {!orgUsersLoading && totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100 dark:border-white/5 shrink-0">
-                <button
-                  onClick={() => setOrgUsersPage((p) => Math.max(1, p - 1))}
-                  disabled={orgUsersPage === 1}
-                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-white/4 text-[12px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/8 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  Prev
-                </button>
-                <span className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Page {orgUsersPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() =>
-                    setOrgUsersPage((p) => Math.min(totalPages, p + 1))
-                  }
-                  disabled={orgUsersPage === totalPages}
-                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-white/4 text-[12px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/8 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      {/* ── Edit User dialog ── */}
-      <Dialog.Root open={editUserOpen} onOpenChange={setEditUserOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#1f2c34] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-white">
-                  Edit User
-                </Dialog.Title>
-                <Dialog.Description className="text-[13px] text-slate-500 dark:text-slate-400">
-                  Update details for{" "}
-                  <span className="font-medium text-slate-700 dark:text-slate-300">
-                    {editTarget?.name}
-                  </span>
-                  .
-                </Dialog.Description>
-              </div>
-              <Dialog.Close asChild>
-                <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 dark:border-white/8 dark:bg-white/4 dark:text-slate-400 dark:hover:bg-white/8">
-                  <X className="h-4 w-4" />
-                </button>
-              </Dialog.Close>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
-                  Full name
-                </label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="Enter user name"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  placeholder="Enter email address"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
-                  User Role
-                </label>
-                <select
-                  value={editRoleCode}
-                  onChange={(e) => setEditRoleCode(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
-                >
-                  <option value="MEMBER">Member</option>
-                  <option value="ADMIN">Admin</option>
-                </select>
-              </div>
-
-              <div>
-                <PasswordStrengthField
-                  label="New password (optional)"
-                  placeholder="Leave blank to keep current password"
-                  value={editPassword}
-                  onChange={setEditPassword}
-                />
-              </div>
-
-              {editError && (
-                <p className="text-[12px] text-rose-500">{editError}</p>
-              )}
-            </div>
-
-            <div className="mt-6 flex items-center gap-3">
-              <Dialog.Close asChild>
-                <button className="flex-1 h-10 rounded-xl border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:border-white/9 dark:bg-white/4 dark:text-slate-300 dark:hover:bg-white/8">
-                  Cancel
-                </button>
-              </Dialog.Close>
+            <span>Manage Users</span>
+          </div>
+        }
+        desc={
+          orgUsersLoading && orgUsersTotal === 0
+            ? "Loading..."
+            : orgUsersTotal > 0
+              ? `${orgUsersTotal} member${orgUsersTotal !== 1 ? "s" : ""} in your organization`
+              : "No members found"
+        }
+        contentClassName="p-0 flex flex-col min-h-0 overflow-hidden"
+        footer={
+          !orgUsersLoading && totalPages > 1 ? (
+            <div className="flex items-center justify-between w-full py-0.5">
               <button
-                type="button"
-                onClick={handleEditUser}
-                disabled={
-                  isEditing ||
-                  editName.trim().length < 2 ||
-                  editEmail.trim().length === 0 ||
-                  editRoleCode.length === 0 ||
-                  (editPassword.length > 0 && editPassword.length < 6)
-                }
-                className="flex-1 h-10 rounded-xl bg-blue-500 text-sm font-medium text-white transition-colors hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => setOrgUsersPage((p) => Math.max(1, p - 1))}
+                disabled={orgUsersPage === 1}
+                className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-white/4 text-[12px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/8 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
-                {isEditing ? "Saving..." : "Save changes"}
+                <ChevronLeft className="w-3.5 h-3.5" />
+                Prev
+              </button>
+              <span className="text-[12px] text-slate-500 dark:text-slate-400 font-medium">
+                Page {orgUsersPage} of {totalPages}
+              </span>
+              <button
+                onClick={() =>
+                  setOrgUsersPage((p) => Math.min(totalPages, p + 1))
+                }
+                disabled={orgUsersPage === totalPages}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-white/4 text-[12px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/8 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                Next
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+          ) : undefined
+        }
+      >
+        <div className="flex flex-col h-full">
+          {/* Search */}
+          <div className="px-5 py-3 border-b border-slate-100 dark:border-white/5 shrink-0 bg-slate-50/40 dark:bg-black/10">
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+              <Input
+                type="text"
+                value={orgUsersSearch}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search by name or email..."
+                className="h-10 pl-10 text-xs"
+              />
+            </div>
+          </div>
+
+          {/* User list */}
+          <div className="overflow-y-auto flex-1 px-4 py-3">
+            {/* Loading skeletons */}
+            {orgUsersLoading && (
+              <div className="space-y-1.5 py-1">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 px-3 py-3 rounded-xl animate-pulse bg-slate-100/50 dark:bg-white/4"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-white/8 shrink-0" />
+                    <div className="flex-1 space-y-1.5 min-w-0">
+                      <div className="h-3 w-28 rounded-md bg-slate-200 dark:bg-white/8" />
+                      <div className="h-2.5 w-44 rounded-md bg-slate-100 dark:bg-white/5" />
+                    </div>
+                    <div className="h-5 w-14 rounded-full bg-slate-100 dark:bg-white/5 shrink-0" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Empty state */}
+            {!orgUsersLoading && orgUsers.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/6 flex items-center justify-center mb-3">
+                  <Users className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                </div>
+                <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400">
+                  {orgUsersSearch
+                    ? "No members match your search"
+                    : "No members found"}
+                </p>
+                {orgUsersSearch && (
+                  <button
+                    onClick={() => handleSearchChange("")}
+                    className="mt-2 text-[12px] text-[var(--accent)] font-medium hover:underline cursor-pointer"
+                  >
+                    Clear search
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* User rows */}
+            {!orgUsersLoading && orgUsers.length > 0 && (
+              <div className="space-y-1 py-1">
+                {orgUsers.map((u) => {
+                  const userInitials = getUserInitials(u.name);
+                  const color = avatarColor(u.name);
+                  const roleCode = roleMap[u.userTypeId] ?? "MEMBER";
+                  const isCurrentUser = u.email === user?.email;
+                  const isHovered = hoveredUserUuid === u.uuid;
+
+                  return (
+                    <div
+                      key={u.uuid}
+                      onMouseEnter={() => setHoveredUserUuid(u.uuid)}
+                      onMouseLeave={() => setHoveredUserUuid(null)}
+                      className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl hover:bg-slate-100/70 dark:hover:bg-white/5 transition-all"
+                    >
+                      {/* Avatar */}
+                      <div
+                        className={`w-9 h-9 shrink-0 rounded-full bg-linear-to-br ${color} flex items-center justify-center text-[11px] font-semibold text-white shadow-xs`}
+                      >
+                        {userInitials}
+                      </div>
+
+                      {/* Name & email */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="text-[13.5px] font-semibold text-slate-800 dark:text-slate-100 truncate">
+                            {u.name}
+                          </p>
+                          {isCurrentUser && (
+                            <span className="shrink-0 text-[10px] font-semibold text-[var(--accent)] bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-px">
+                              You
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11.5px] text-slate-400 dark:text-slate-500 truncate">
+                          {u.email}
+                        </p>
+                      </div>
+
+                      {/* Role badge */}
+                      <motion.span
+                        layout="position"
+                        transition={{ duration: 0.18, ease: "easeOut" }}
+                        className={cn(
+                          "shrink-0 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border",
+                          roleCode === "ADMIN"
+                            ? "bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20"
+                            : "bg-slate-100 text-slate-500 border-slate-200 dark:bg-white/6 dark:text-slate-400 dark:border-white/10",
+                        )}
+                      >
+                        {roleCode === "ADMIN" ? "Admin" : "Member"}
+                      </motion.span>
+
+                      {/* Action buttons */}
+                      <AnimatePresence initial={false}>
+                        {isHovered && (
+                          <motion.div
+                            key="actions"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            transition={{ duration: 0.18, ease: "easeOut" }}
+                            className="flex items-center gap-1 shrink-0"
+                          >
+                            {/* Edit */}
+                            <motion.button
+                              initial={{ opacity: 0, x: 12 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{
+                                duration: 0.18,
+                                delay: 0.03,
+                                ease: "easeOut",
+                              }}
+                              onClick={() => openEditUser(u)}
+                              title="Edit user"
+                              className="flex h-7.5 w-7.5 items-center justify-center rounded-xl text-slate-400 dark:text-slate-500 hover:bg-emerald-50 hover:text-[var(--accent)] dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </motion.button>
+
+                            {/* Activate */}
+                            <motion.button
+                              initial={{ opacity: 0, x: 12 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{
+                                duration: 0.18,
+                                delay: 0.06,
+                                ease: "easeOut",
+                              }}
+                              onClick={() => {
+                                if (!u.isActive) openStatusConfirm(u);
+                              }}
+                              title={
+                                u.isActive
+                                  ? "User is active"
+                                  : "Activate user"
+                              }
+                              className={cn(
+                                "flex h-7.5 w-7.5 items-center justify-center rounded-xl transition-colors cursor-pointer",
+                                u.isActive
+                                  ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 cursor-default"
+                                  : "text-slate-400 dark:text-slate-500 hover:bg-emerald-50 hover:text-emerald-500 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400",
+                              )}
+                            >
+                              <UserRoundCheck className="w-3.5 h-3.5" />
+                            </motion.button>
+
+                            {/* Deactivate */}
+                            <motion.button
+                              initial={{ opacity: 0, x: 12 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{
+                                duration: 0.18,
+                                delay: 0.09,
+                                ease: "easeOut",
+                              }}
+                              onClick={() => {
+                                if (u.isActive) openStatusConfirm(u);
+                              }}
+                              title={
+                                u.isActive
+                                  ? "Deactivate user"
+                                  : "User is inactive"
+                              }
+                              className={cn(
+                                "flex h-7.5 w-7.5 items-center justify-center rounded-xl transition-colors cursor-pointer",
+                                !u.isActive
+                                  ? "bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 cursor-default"
+                                  : "text-slate-400 dark:text-slate-500 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-500/10 dark:hover:text-rose-400",
+                              )}
+                            >
+                              <UserRoundX className="w-3.5 h-3.5" />
+                            </motion.button>
+
+                            {/* Delete */}
+                            {!isCurrentUser && (
+                              <motion.button
+                                initial={{ opacity: 0, x: 12 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{
+                                  duration: 0.18,
+                                  delay: 0.12,
+                                  ease: "easeOut",
+                                }}
+                                onClick={() => openDeleteUser(u)}
+                                title="Delete user"
+                                className="flex h-7.5 w-7.5 items-center justify-center rounded-xl text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </motion.button>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </BaseModal>
+
+      {/* ── Edit User dialog ── */}
+      <BaseModal
+        open={editUserOpen}
+        onOpenChange={setEditUserOpen}
+        title={
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center shrink-0">
+              <Pencil className="w-4 h-4 text-[var(--accent)]" />
+            </div>
+            <span>Edit User</span>
+          </div>
+        }
+        desc={
+          <>
+            Update details for{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {editTarget?.name}
+            </span>
+            .
+          </>
+        }
+        size="md"
+        footer={
+          <div className="flex items-center gap-3 w-full">
+            <button
+              type="button"
+              onClick={() => setEditUserOpen(false)}
+              className="flex-1 h-10 rounded-xl border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:border-white/9 dark:bg-white/4 dark:text-slate-300 dark:hover:bg-white/8 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleEditUser}
+              disabled={
+                isEditing ||
+                editName.trim().length < 2 ||
+                editEmail.trim().length === 0 ||
+                editRoleCode.length === 0 ||
+                (editPassword.length > 0 && editPassword.length < 6)
+              }
+              className="flex-1 h-10 rounded-xl bg-[var(--accent)] text-sm font-semibold text-white transition-all hover:brightness-110 shadow-md shadow-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            >
+              {isEditing ? "Saving..." : "Save changes"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              Full name
+            </label>
+            <Input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Enter user name"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              Email
+            </label>
+            <Input
+              type="email"
+              value={editEmail}
+              onChange={(e) => setEditEmail(e.target.value)}
+              placeholder="Enter email address"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              User Role
+            </label>
+            <Select value={editRoleCode} onValueChange={setEditRoleCode}>
+              <SelectTrigger className="h-11 w-full rounded-xl border border-[var(--border-color)] bg-[var(--input-bg)] px-3.5 text-sm text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent)]/30">
+                <SelectValue placeholder="Select user role" />
+              </SelectTrigger>
+              <SelectContent className="z-[70] rounded-xl bg-white dark:bg-[#1f2c34] border border-slate-200 dark:border-white/10 shadow-xl">
+                <SelectItem value="MEMBER">Member</SelectItem>
+                <SelectItem value="ADMIN">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <PasswordStrengthField
+              label="New password (optional)"
+              placeholder="Leave blank to keep current password"
+              value={editPassword}
+              onChange={setEditPassword}
+            />
+          </div>
+
+          {editError && (
+            <p className="text-[12px] text-rose-500 font-medium">{editError}</p>
+          )}
+        </div>
+      </BaseModal>
 
       {/* ── Delete User confirmation dialog ── */}
       <Dialog.Root open={deleteUserOpen} onOpenChange={setDeleteUserOpen}>
@@ -1336,7 +1326,7 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
       </Dialog.Root>
 
       {/* ── Update Profile dialog ── */}
-      <Dialog.Root
+      <BaseModal
         open={updateProfileOpen}
         onOpenChange={(open) => {
           setUpdateProfileOpen(open);
@@ -1347,178 +1337,169 @@ export function UserMenu({ collapsed = false }: UserMenuProps) {
             setProfileError(null);
           }
         }}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/10 dark:border-white/9 dark:bg-[#1f2c34] dark:shadow-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
-            {/* Header */}
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <Dialog.Title className="text-base font-semibold text-slate-900 dark:text-white">
-                  Update Profile
-                </Dialog.Title>
-                <Dialog.Description className="text-[13px] text-slate-500 dark:text-slate-400">
-                  Update your personal details and profile picture.
-                </Dialog.Description>
-              </div>
-              <Dialog.Close asChild>
-                <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 dark:border-white/8 dark:bg-white/4 dark:text-slate-400 dark:hover:bg-white/8">
-                  <X className="h-4 w-4" />
-                </button>
-              </Dialog.Close>
+        title={
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center shrink-0">
+              <UserCircle className="w-4 h-4 text-[var(--accent)]" />
             </div>
-
-            {isLoadingProfile ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-              </div>
-            ) : (
-              <div className="space-y-5">
-                {/* Profile picture upload */}
-                <div className="flex flex-col items-center gap-3">
-                  <div className="relative group">
-                    <div className="w-20 h-20 rounded-full overflow-hidden ring-4 ring-slate-100 dark:ring-white/8 shadow-lg">
-                      {(profilePicPreview ?? currentProfilePicUrl) ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={profilePicPreview ?? currentProfilePicUrl ?? ""}
-                          alt="Profile"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-xl font-semibold text-white">
-                          {initials}
-                        </div>
-                      )}
+            <span>Update Profile</span>
+          </div>
+        }
+        desc="Update your personal details and profile picture."
+        size="md"
+        className="max-h-[85vh] sm:max-h-[580px]"
+        footer={
+          !isLoadingProfile ? (
+            <div className="flex items-center gap-3 w-full py-0.5">
+              <button
+                type="button"
+                onClick={() => setUpdateProfileOpen(false)}
+                className="flex-1 h-10 rounded-xl border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:border-white/9 dark:bg-white/4 dark:text-slate-300 dark:hover:bg-white/8 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveProfile()}
+                disabled={
+                  isSavingProfile ||
+                  profileName.trim().length < 2 ||
+                  profileEmail.trim().length === 0 ||
+                  (profilePassword.length > 0 && profilePassword.length < 6)
+                }
+                className="flex-1 h-10 rounded-xl bg-[var(--accent)] text-sm font-semibold text-white transition-all hover:brightness-110 shadow-md shadow-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isSavingProfile && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                )}
+                {isSavingProfile ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          ) : undefined
+        }
+      >
+        {isLoadingProfile ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--accent)]" />
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* Profile picture upload */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative group">
+                <div className="w-20 h-20 rounded-full overflow-hidden ring-4 ring-slate-100 dark:ring-white/8 shadow-lg">
+                  {(profilePicPreview ?? currentProfilePicUrl) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profilePicPreview ?? currentProfilePicUrl ?? ""}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-[#00a884] via-emerald-600 to-teal-700 flex items-center justify-center text-xl font-semibold text-white">
+                      {initials}
                     </div>
-                    {/* Camera overlay */}
-                    <button
-                      type="button"
-                      onClick={() => profilePicInputRef.current?.click()}
-                      className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Change profile picture"
-                    >
-                      <Camera className="h-5 w-5 text-white" />
-                    </button>
-                  </div>
-                  <input
-                    ref={profilePicInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png"
-                    className="hidden"
-                    onChange={handleProfilePicChange}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => profilePicInputRef.current?.click()}
-                    className="text-[12px] font-medium text-blue-500 dark:text-blue-400 hover:underline"
-                  >
-                    {profilePicPreview
-                      ? "Change photo"
-                      : currentProfilePicUrl
-                        ? "Replace photo"
-                        : "Upload photo"}
-                  </button>
-                  {profilePicFile && (
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                      {profilePicFile.name} ·{" "}
-                      {(profilePicFile.size / 1024).toFixed(0)} KB
-                    </p>
                   )}
                 </div>
-
-                {/* Divider */}
-                <div className="h-px bg-slate-100 dark:bg-white/6" />
-
-                {/* Name */}
-                <div>
-                  <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
-                    Full name
-                  </label>
-                  <input
-                    type="text"
-                    value={profileName}
-                    onChange={(e) => setProfileName(e.target.value)}
-                    placeholder="Enter your name"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
-                  />
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={profileEmail}
-                    onChange={(e) => setProfileEmail(e.target.value)}
-                    placeholder="Enter your email"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
-                  />
-                </div>
-
-                {/* Role — visible to admins only */}
-                {isAdmin && (
-                  <div>
-                    <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
-                      User Role
-                    </label>
-                    <select
-                      value={profileRoleCode}
-                      onChange={(e) => setProfileRoleCode(e.target.value)}
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors focus:border-blue-400 dark:border-white/8 dark:bg-white/4 dark:text-slate-100"
-                    >
-                      <option value="MEMBER">Member</option>
-                      <option value="ADMIN">Admin</option>
-                    </select>
-                  </div>
-                )}
-
-                {/* Password */}
-                <div>
-                  <PasswordStrengthField
-                    label="New password (optional)"
-                    placeholder="Leave blank to keep current password"
-                    value={profilePassword}
-                    onChange={setProfilePassword}
-                  />
-                </div>
-
-                {profileError && (
-                  <p className="text-[12px] text-rose-500">{profileError}</p>
-                )}
-              </div>
-            )}
-
-            {!isLoadingProfile && (
-              <div className="mt-6 flex items-center gap-3">
-                <Dialog.Close asChild>
-                  <button className="flex-1 h-10 rounded-xl border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:border-white/9 dark:bg-white/4 dark:text-slate-300 dark:hover:bg-white/8">
-                    Cancel
-                  </button>
-                </Dialog.Close>
+                {/* Camera overlay */}
                 <button
                   type="button"
-                  onClick={() => void handleSaveProfile()}
-                  disabled={
-                    isSavingProfile ||
-                    profileName.trim().length < 2 ||
-                    profileEmail.trim().length === 0 ||
-                    (profilePassword.length > 0 && profilePassword.length < 6)
-                  }
-                  className="flex-1 h-10 rounded-xl bg-blue-500 text-sm font-medium text-white transition-colors hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+                  onClick={() => profilePicInputRef.current?.click()}
+                  className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  title="Change profile picture"
                 >
-                  {isSavingProfile && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  )}
-                  {isSavingProfile ? "Saving..." : "Save changes"}
+                  <Camera className="h-5 w-5 text-white" />
                 </button>
               </div>
+              <input
+                ref={profilePicInputRef}
+                type="file"
+                accept="image/jpeg,image/png"
+                className="hidden"
+                onChange={handleProfilePicChange}
+              />
+              <button
+                type="button"
+                onClick={() => profilePicInputRef.current?.click()}
+                className="text-[12px] font-semibold text-[var(--accent)] hover:underline cursor-pointer"
+              >
+                {profilePicPreview
+                  ? "Change photo"
+                  : currentProfilePicUrl
+                    ? "Replace photo"
+                    : "Upload photo"}
+              </button>
+              {profilePicFile && (
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                  {profilePicFile.name} ·{" "}
+                  {(profilePicFile.size / 1024).toFixed(0)} KB
+                </p>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-slate-100 dark:bg-white/6" />
+
+            {/* Name */}
+            <div>
+              <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+                Full name
+              </label>
+              <Input
+                type="text"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                placeholder="Enter your name"
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+                Email
+              </label>
+              <Input
+                type="email"
+                value={profileEmail}
+                onChange={(e) => setProfileEmail(e.target.value)}
+                placeholder="Enter your email"
+              />
+            </div>
+
+            {/* Role — visible to admins only */}
+            {isAdmin && (
+              <div>
+                <label className="mb-1.5 block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+                  User Role
+                </label>
+                <Select value={profileRoleCode} onValueChange={setProfileRoleCode}>
+                  <SelectTrigger className="h-11 w-full rounded-xl border border-[var(--border-color)] bg-[var(--input-bg)] px-3.5 text-sm text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent)]/30">
+                    <SelectValue placeholder="Select user role" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[70] rounded-xl bg-white dark:bg-[#1f2c34] border border-slate-200 dark:border-white/10 shadow-xl">
+                    <SelectItem value="MEMBER">Member</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             )}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+
+            {/* Password */}
+            <div>
+              <PasswordStrengthField
+                label="New password (optional)"
+                placeholder="Leave blank to keep current password"
+                value={profilePassword}
+                onChange={setProfilePassword}
+              />
+            </div>
+
+            {profileError && (
+              <p className="text-[12px] text-rose-500 font-medium">{profileError}</p>
+            )}
+          </div>
+        )}
+      </BaseModal>
 
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </Dialog.Root>

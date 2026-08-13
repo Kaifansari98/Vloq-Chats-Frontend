@@ -445,18 +445,7 @@ export function ChatLayout() {
       toast.info(notification.title, {
         description: notification.body,
         duration: 5000,
-        action: notification.conversationUuid
-          ? {
-              label: "Open",
-              onClick: () => {
-                localStorage.setItem(
-                  "vloq:selectedChatId",
-                  notification.conversationUuid!,
-                );
-                setSelectedId(notification.conversationUuid);
-              },
-            }
-          : undefined,
+        className: "chat-notification",
       });
     });
 
