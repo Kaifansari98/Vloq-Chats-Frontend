@@ -67,6 +67,12 @@ export function BaseModal({
           className
         )}
       >
+        {!title && (
+          <DialogTitle className="sr-only">Modal</DialogTitle>
+        )}
+        {!modalDescription && (
+          <DialogDescription className="sr-only">Modal content</DialogDescription>
+        )}
         {(title || modalDescription || headerExtra) && (
           <DialogHeader
             className={cn(
