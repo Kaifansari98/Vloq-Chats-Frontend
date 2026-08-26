@@ -330,6 +330,35 @@ function isImageFileType(mimeType: string) {
   return mimeType.startsWith("image/");
 }
 
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getDocBadgeStyle(mimeType: string, fileName: string) {
+  const ext = getFileExtension(fileName).toLowerCase();
+  if (ext === "pdf" || mimeType === "application/pdf") {
+    return { bg: "bg-rose-500/10 dark:bg-rose-500/20", text: "text-rose-600 dark:text-rose-400" };
+  }
+  if (["xls", "xlsx", "csv"].includes(ext) || mimeType.includes("sheet") || mimeType.includes("excel") || mimeType === "text/csv") {
+    return { bg: "bg-emerald-500/10 dark:bg-emerald-500/20", text: "text-emerald-600 dark:text-emerald-400" };
+  }
+  if (["doc", "docx"].includes(ext) || mimeType.includes("word")) {
+    return { bg: "bg-blue-500/10 dark:bg-blue-500/20", text: "text-blue-600 dark:text-blue-400" };
+  }
+  if (["ppt", "pptx"].includes(ext) || mimeType.includes("presentation")) {
+    return { bg: "bg-amber-500/10 dark:bg-amber-500/20", text: "text-amber-600 dark:text-amber-400" };
+  }
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext) || mimeType.includes("zip")) {
+    return { bg: "bg-purple-500/10 dark:bg-purple-500/20", text: "text-purple-600 dark:text-purple-400" };
+  }
+  if (["mp3", "wav", "ogg", "m4a"].includes(ext) || mimeType.startsWith("audio/")) {
+    return { bg: "bg-cyan-500/10 dark:bg-cyan-500/20", text: "text-cyan-600 dark:text-cyan-400" };
+  }
+  return { bg: "bg-slate-500/10 dark:bg-slate-500/20", text: "text-slate-600 dark:text-slate-300" };
+}
+
 function getFileExtension(fileName: string) {
   const parts = fileName.split(".");
   if (parts.length < 2) return "FILE";
@@ -693,10 +722,13 @@ function SelectedFileChip({
     reader.readAsDataURL(file);
   }, [file, isImage]);
 
+  const ext = getFileExtension(file.name);
+  const badgeStyle = getDocBadgeStyle(file.type, file.name);
+
   return (
-    <div className="relative group shrink-0">
+    <div className="relative group shrink-0 transition-transform active:scale-95">
       {isImage && previewUrl ? (
-        <div className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 dark:border-white/10">
+        <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-xs relative bg-slate-100 dark:bg-[#202c33]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={previewUrl}
@@ -705,19 +737,34 @@ function SelectedFileChip({
           />
         </div>
       ) : (
-        <div className="flex h-16 w-16 items-center justify-center bg-slate-100 dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-lg px-2">
-          <span className="text-[11px] font-semibold tracking-wide text-slate-600 dark:text-slate-300">
-            .{getFileExtension(file.name)}
-          </span>
+        <div className="flex h-16 w-32 flex-col justify-between rounded-xl border border-slate-200/90 dark:border-white/10 bg-slate-50/90 dark:bg-[#202c33] p-2.5 shadow-xs transition-colors hover:border-slate-300 dark:hover:border-white/20">
+          <div className="flex items-center justify-between gap-1">
+            <span
+              className={`rounded-md px-1.5 py-0.5 text-[9.5px] font-bold tracking-wider uppercase ${badgeStyle.bg} ${badgeStyle.text}`}
+            >
+              .{ext}
+            </span>
+          </div>
+          <div className="min-w-0">
+            <p
+              className="truncate text-[11px] font-medium text-slate-700 dark:text-slate-200 leading-tight"
+              title={file.name}
+            >
+              {file.name}
+            </p>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+              {formatBytes(file.size)}
+            </p>
+          </div>
         </div>
       )}
       <button
         type="button"
         onClick={onRemove}
-        className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-slate-700 dark:bg-slate-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute -top-1.5 -right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white shadow-md transition-all hover:bg-rose-600 hover:scale-110 dark:bg-slate-700 dark:hover:bg-rose-500"
         aria-label="Remove file"
       >
-        <X className="w-2.5 h-2.5" />
+        <X className="h-3 w-3" />
       </button>
     </div>
   );
@@ -1548,7 +1595,13 @@ export function ChatWindow({
           {/* Messages + Floating Input overlay */}
           <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
             {/* Scrollable Messages Area */}
-            <div className="flex-1 overflow-y-auto px-6 pt-4 pb-20 ">
+            <div
+              className={`flex-1 overflow-y-auto px-6 pt-4 transition-all ${
+                selectedFiles.length > 0 || replyToMessage
+                  ? "pb-64"
+                  : "pb-24"
+              }`}
+            >
               {isLoadingMessages ? (
                 <div className="h-full flex items-center justify-center text-[12px] text-slate-400 dark:text-slate-600">
                   Loading messages...
@@ -2069,87 +2122,93 @@ export function ChatWindow({
                   onSend={sendRecording}
                 />
               ) : (
-                <div className="bg-transparent border-0 overflow-hidden">
-                  {replyToMessage && (
-                    <div className="flex items-center gap-3 px-3.5 py-2.5 border-b border-slate-200 dark:border-white/8">
-                      <div className="w-[3px] self-stretch shrink-0 rounded-full bg-blue-500" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-semibold text-blue-500 dark:text-blue-400 leading-none mb-1">
-                          {replyToMessage.senderName}
-                        </p>
-                        {replyToMessage.attachments[0]?.mimeType.startsWith(
-                          "audio/",
-                        ) ? (
-                          <p className="flex items-center gap-1 text-[11px] text-emerald-500 dark:text-emerald-400">
-                            <Mic className="h-3 w-3" /> Voice message
-                          </p>
-                        ) : replyToMessage.attachments[0]?.mimeType.startsWith(
-                            "image/",
-                          ) ? (
-                          <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                            <ImageIcon className="h-3 w-3" /> Image
-                          </p>
-                        ) : replyToMessage.attachments.length > 0 ? (
-                          <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                            <FileText className="h-3 w-3" /> File
-                          </p>
-                        ) : (
-                          <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                            {replyToMessage.content}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={onCancelReply}
-                        aria-label="Cancel reply"
-                        className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-white/20 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                  {/* Selected files preview */}
-                  {selectedFiles.length > 0 && (
-                    <div className="flex flex-wrap gap-2 px-4 pt-3 pb-1">
-                      {selectedFiles.map((file, i) => (
-                        <SelectedFileChip
-                          key={`${file.name}-${file.size}-${i}`}
-                          file={file}
-                          onRemove={() => onRemoveFile(i)}
-                        />
-                      ))}
-                      {selectedFiles.length < MAX_FILES && (
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-16 h-16 rounded-lg border-2 border-dashed border-slate-300 dark:border-white/15 flex items-center justify-center text-slate-400 dark:text-slate-600 hover:border-blue-400 hover:text-blue-400 transition-colors shrink-0"
-                        >
-                          <Paperclip className="w-4 h-4" />
-                        </button>
+                <div className="rounded-[24px] bg-white dark:bg-[#202c33] border border-slate-200/90 dark:border-white/10 overflow-hidden focus-within:border-emerald-500/50 dark:focus-within:border-emerald-500/50 transition-all">
+                  {/* Integrated Top Drawer Card Panel */}
+                  {(replyToMessage || selectedFiles.length > 0 || fileError) && (
+                    <div className="border-b border-slate-200/60 dark:border-white/10 p-3 pb-2 transition-all">
+                      {replyToMessage && (
+                        <div className="flex items-center gap-3 px-1.5 py-1 border-b border-slate-200/60 dark:border-white/8 pb-2.5 mb-2">
+                          <div className="w-[3px] self-stretch shrink-0 rounded-full bg-emerald-500" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 leading-none mb-1">
+                              Replying to {replyToMessage.senderName}
+                            </p>
+                            {replyToMessage.attachments[0]?.mimeType.startsWith(
+                              "audio/",
+                            ) ? (
+                              <p className="flex items-center gap-1 text-[11px] text-emerald-500 dark:text-emerald-400">
+                                <Mic className="h-3 w-3" /> Voice message
+                              </p>
+                            ) : replyToMessage.attachments[0]?.mimeType.startsWith(
+                                "image/",
+                              ) ? (
+                              <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                <ImageIcon className="h-3 w-3" /> Image
+                              </p>
+                            ) : replyToMessage.attachments.length > 0 ? (
+                              <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                <FileText className="h-3 w-3" /> File
+                              </p>
+                            ) : (
+                              <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                                {replyToMessage.content}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={onCancelReply}
+                            aria-label="Cancel reply"
+                            className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-white/20 transition-colors"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
                       )}
-                    </div>
-                  )}
 
-                  {(selectedFiles.length > 0 || fileError) && (
-                    <div className="px-4 pt-2">
+                      {/* Selected files preview */}
                       {selectedFiles.length > 0 && (
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          Up to 5 files per message. JPG, JPEG, PNG, PDF, DOC,
-                          DOCX, XLS, XLSX, CSV, ZIP, PPT, PPTX, MP3 and WAV
-                          only. Max 50 MB each.
-                        </p>
+                        <div className="flex flex-wrap gap-2.5 max-h-48 overflow-y-auto custom-scrollbar p-0.5">
+                          {selectedFiles.map((file, i) => (
+                            <SelectedFileChip
+                              key={`${file.name}-${file.size}-${i}`}
+                              file={file}
+                              onRemove={() => onRemoveFile(i)}
+                            />
+                          ))}
+                          {selectedFiles.length < MAX_FILES && (
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 dark:border-white/15 flex flex-col items-center justify-center gap-1 text-slate-400 dark:text-slate-500 hover:border-emerald-500 hover:text-emerald-500 dark:hover:border-emerald-400 dark:hover:text-emerald-400 transition-colors shrink-0"
+                              title="Add more files"
+                            >
+                              <Paperclip className="w-4 h-4" />
+                              <span className="text-[9px] font-medium">+ Add</span>
+                            </button>
+                          )}
+                        </div>
                       )}
-                      {fileError && (
-                        <p className="mt-1 text-[11px] text-rose-500">
-                          {fileError}
-                        </p>
+
+                      {(selectedFiles.length > 0 || fileError) && (
+                        <div className="px-0.5 pt-1.5 flex flex-col gap-0.5">
+                          {selectedFiles.length > 0 && (
+                            <p className="text-[10.5px] text-slate-500 dark:text-slate-400">
+                              Up to 5 files per message. JPG, PNG, PDF, DOCX, XLSX, CSV, ZIP, MP3, WAV only. Max 50 MB each.
+                            </p>
+                          )}
+                          {fileError && (
+                            <p className="text-[11px] font-medium text-rose-500 dark:text-rose-400">
+                              {fileError}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
 
                   {/* WhatsApp Pill Input Bar */}
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 min-h-[52px] max-h-[220px] rounded-[24px] bg-white dark:bg-[#202c33] border border-slate-200/90 dark:border-white/10 shadow-xs focus-within:border-emerald-500/50 dark:focus-within:border-emerald-500/50 transition-all">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 min-h-[52px] max-h-[220px]">
                     {/* Plus / Attach */}
                     <div className="flex items-center self-center shrink-0">
                       <AttachMenu
@@ -2245,7 +2304,9 @@ export function ChatWindow({
 
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
-                          onSendMessage();
+                          if (canSend) {
+                            onSendMessage();
+                          }
                         }
                       }}
                       style={{ height: "auto" }}
@@ -2253,16 +2314,16 @@ export function ChatWindow({
                     />
 
                     {/* Right Action: Send OR Mic button */}
-                    <div className="flex items-center self-center shrink-0">
+                    <div className="flex items-center justify-center shrink-0 self-center my-auto">
                       {message.trim().length > 0 || selectedFiles.length > 0 ? (
                         <button
                           type="button"
                           onClick={onSendMessage}
                           disabled={!canSend}
                           title="Send message"
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white hover:bg-[#008f70] transition-colors shadow-xs"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white hover:bg-[#008f70] active:scale-95 transition-all disabled:opacity-50"
                         >
-                          <Send className="w-4 h-4 translate-x-0.5" />
+                          <Send className="h-4 w-4 stroke-[2.2]" />
                         </button>
                       ) : (
                         <button
